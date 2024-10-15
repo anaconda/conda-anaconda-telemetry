@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "anaconda-conda-telemetry"
 version = "0.1.0"
-description = "Conda telemetry for Anaconda"
+description = "A conda plugin for Anaconda telemetry"
 requires-python = ">=3.8"
 classifiers = [
   "Operating System :: OS Independent",
