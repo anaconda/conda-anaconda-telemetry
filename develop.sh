@@ -8,8 +8,9 @@ fi
 
 CONDA_ENV_DIR="./env"
 
-conda env $(test -d "$CONDA_ENV_DIR" && echo update || echo create) -p "$CONDA_ENV_DIR" --file environment.yml
+conda env $(test -d "$CONDA_ENV_DIR" && echo update || echo create) -p "$CONDA_ENV_DIR" --file environment.yaml
 conda activate "$CONDA_ENV_DIR"
+conda install --file requirements.dev.txt --yes
 pip install --no-deps --no-index --no-build-isolation -e .
 
 CONDA_EXE="$CONDA_PREFIX/condabin/conda"

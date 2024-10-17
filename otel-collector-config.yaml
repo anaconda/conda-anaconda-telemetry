@@ -1,0 +1,36 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+exporters:
+  elasticsearch:
+    endpoint: http://elasticsearch:9200
+    traces_index: anaconda-conda-telemetry
+    auth:
+      authenticator: basicauth
+
+extensions:
+  health_check:
+  pprof:
+  zpages:
+  basicauth:
+    client_auth:
+      username: elastic
+      password: password
+
+processors:
+  batch:
+
+service:
+  extensions: [basicauth, health_check, pprof, zpages]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [elasticsearch]
+      processors: [batch]
+    logs:
+      receivers: [otlp]
+      exporters: [elasticsearch]
+      processors: [batch]

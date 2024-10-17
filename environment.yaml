@@ -3,3 +3,6 @@ channels:
 dependencies:
   - python>=3.8
   - conda-canary/label/dev::conda
+  - opentelemetry-api
+  - opentelemetry-sdk
+  - opentelemetry-exporter-otlp-proto-grpc
