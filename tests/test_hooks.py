@@ -1,4 +1,25 @@
+import pytest
+
 from anaconda_conda_telemetry.hooks import conda_request_headers, HEADER_PREFIX
+
+
+@pytest.fixture(autouse=True)
+def packages(mocker):
+    """
+    Mocks ``anaconda_conda_telemetry.hooks.list_packages``
+    """
+    packages = [
+        "defaults/osx-arm64::sqlite-3.45.3-h80987f9_0",
+        "defaults/osx-arm64::pcre2-10.42-hb066dcc_1",
+        "defaults/osx-arm64::libxml2-2.13.1-h0b34f26_2",
+    ]
+
+    def mock_list_packages(*args, **kwargs):
+        return 0, packages
+
+    mocker.patch("anaconda_conda_telemetry.hooks.list_packages", mock_list_packages)
+
+    return packages
 
 
 def test_conda_request_header_default_headers():

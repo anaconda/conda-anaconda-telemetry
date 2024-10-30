@@ -35,5 +35,4 @@ jobs:
           pip install -e .
       - name: Test with pytest
         run: |
-          conda activate
           pytest --doctest-modules
