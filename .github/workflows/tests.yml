@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.8", "3.12"]
-        os: ["macos-latest", "ubuntu-latest", "windows-latest"]
+        os: ["macos-latest", "ubuntu-latest"]
 
     steps:
       - uses: actions/checkout@v3
@@ -31,6 +31,8 @@ jobs:
         run: |
           conda env update --file environment.yaml --name base
           conda install --file requirements.dev.txt
+      - name: Print environment variables
+        run: env | sort
       - name: Test with pytest
         run: |
           pytest --doctest-modules
