@@ -31,8 +31,10 @@ jobs:
         run: |
           conda env update --file environment.yaml --name base
           conda install --file requirements.dev.txt
-      - name: Print environment variables
-        run: env | sort
+      - name: Conda info
+        run: |
+          conda info
+          conda list
       - name: Test with pytest
         run: |
           pytest --doctest-modules
