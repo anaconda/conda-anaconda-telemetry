@@ -188,7 +188,9 @@ def validate_headers(
     Any headers over their individual limits will be truncated.
     """
     total_max_size = sum(header.size_limit for header in custom_headers)
-    assert total_max_size <= SIZE_LIMIT
+    assert (
+        total_max_size <= SIZE_LIMIT
+    ), f"Total header size limited to {SIZE_LIMIT}. Exceeded with {total_max_size=}"
 
     for wrapper in custom_headers:
         wrapper.header.value = wrapper.header.value[: wrapper.size_limit]
