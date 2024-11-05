@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import logging
-import sys
 import time
 import typing
 
@@ -31,6 +30,24 @@ SIZE_LIMIT = 7_000
 #: Prefix for all custom headers submitted via this plugin
 HEADER_PREFIX = "Anaconda-Telemetry"
 
+#: Name of the virtual package header
+HEADER_VIRTUAL_PACKAGES = f"{HEADER_PREFIX}-Virtual-Packages"
+
+#: Name of the channels header
+HEADER_CHANNELS = f"{HEADER_PREFIX}-Channels"
+
+#: Name of the packages header
+HEADER_PACKAGES = f"{HEADER_PREFIX}-Packages"
+
+#: Name of the search header
+HEADER_SEARCH = f"{HEADER_PREFIX}-Search"
+
+#: Name of the install header
+HEADER_INSTALL = f"{HEADER_PREFIX}-Install"
+
+#: Name of the sys info header
+HEADER_SYS_INFO = f"{HEADER_PREFIX}-Sys-Info"
+
 #: Hosts we want to submit request headers to
 REQUEST_HEADER_HOSTS = {"repo.anaconda.com", "conda.anaconda.org"}
 
@@ -38,14 +55,17 @@ REQUEST_HEADER_HOSTS = {"repo.anaconda.com", "conda.anaconda.org"}
 def timer(func):
     @functools.wraps(func)
     def wrapper_timer(*args, **kwargs):
-        tic = time.perf_counter()
-        value = func(*args, **kwargs)
-        toc = time.perf_counter()
-        elapsed_time = toc - tic
-        logger.info(
-            f"function: {func.__name__}; duration (seconds): {elapsed_time:0.4f}"
-        )
-        return value
+        if logger.getEffectiveLevel() <= logging.INFO:
+            tic = time.perf_counter()
+            value = func(*args, **kwargs)
+            toc = time.perf_counter()
+            elapsed_time = toc - tic
+            logger.info(
+                f"function: {func.__name__}; duration (seconds): {elapsed_time:0.4f}"
+            )
+            return value
+
+        return func(*args, **kwargs)
 
     return wrapper_timer
 
@@ -68,12 +88,11 @@ def get_channel_urls() -> tuple[str, ...]:
     return tuple(mask_anaconda_token(c) for c in channels)
 
 
-def get_conda_command() -> str | None:
+def get_conda_command() -> str:
     """
     Use ``sys.argv`` to determine the conda command that is current being run
     """
-    if len(sys.argv) > 2:
-        return sys.argv[1]
+    return context._argparse_args.cmd
 
 
 def get_package_list() -> tuple[str, ...]:
@@ -181,7 +200,7 @@ def conda_request_headers():
     custom_headers = [
         HeaderWrapper(
             header=CondaRequestHeader(
-                name=f"{HEADER_PREFIX}-Sys-Info",
+                name=HEADER_SYS_INFO,
                 description="Custom headers used to submit telemetry data",
                 value=get_sys_info_header_value(),
                 hosts=REQUEST_HEADER_HOSTS,
@@ -190,7 +209,7 @@ def conda_request_headers():
         ),
         HeaderWrapper(
             header=CondaRequestHeader(
-                name=f"{HEADER_PREFIX}-Channels",
+                name=HEADER_CHANNELS,
                 description="Header which exposes the channel URLs currently in use",
                 value=get_channel_urls_header_value(),
                 hosts=REQUEST_HEADER_HOSTS,
@@ -199,7 +218,7 @@ def conda_request_headers():
         ),
         HeaderWrapper(
             header=CondaRequestHeader(
-                name=f"{HEADER_PREFIX}-Virtual-Pkgs",
+                name=HEADER_VIRTUAL_PACKAGES,
                 description="Header which exposes the virtual packages currently in use",
                 value=get_virtual_packages_header_value(),
                 hosts=REQUEST_HEADER_HOSTS,
@@ -208,7 +227,7 @@ def conda_request_headers():
         ),
         HeaderWrapper(
             header=CondaRequestHeader(
-                name=f"{HEADER_PREFIX}-Packages",
+                name=HEADER_PACKAGES,
                 description="Header which exposes the currently installed packages",
                 value=get_installed_packages_header_value(),
                 hosts=REQUEST_HEADER_HOSTS,
@@ -223,7 +242,7 @@ def conda_request_headers():
         custom_headers.append(
             HeaderWrapper(
                 header=CondaRequestHeader(
-                    name=f"{HEADER_PREFIX}-Search",
+                    name=HEADER_SEARCH,
                     description="Header which exposes what is being searched for",
                     value=get_search_term(),
                     hosts=REQUEST_HEADER_HOSTS,
@@ -236,7 +255,7 @@ def conda_request_headers():
         custom_headers.append(
             HeaderWrapper(
                 header=CondaRequestHeader(
-                    name=f"{HEADER_PREFIX}-Install",
+                    name=HEADER_INSTALL,
                     description="Header which exposes what is currently being installed as "
                     "specified on the command line",
                     value=get_install_arguments_header_value(),
