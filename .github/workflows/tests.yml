@@ -31,6 +31,7 @@ jobs:
         run: |
           conda env update --file environment.yaml --name test
           conda install --name test --file requirements.dev.txt
+          conda run --name test pip install -e .
       - name: Conda info
         run: |
           conda info

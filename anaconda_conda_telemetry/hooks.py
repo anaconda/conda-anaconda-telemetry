@@ -6,10 +6,11 @@ import time
 import typing
 
 from conda.base.context import context
+from conda.common.configuration import PrimitiveParameter
 from conda.cli.main_list import list_packages
 from conda.common.url import mask_anaconda_token
 from conda.models.channel import all_channel_urls
-from conda.plugins import hookimpl, CondaRequestHeader
+from conda.plugins import hookimpl, CondaRequestHeader, CondaSetting
 
 try:
     from conda_build import __version__ as CONDA_BUILD_VERSION
@@ -199,6 +200,9 @@ def validate_headers(
 
 @hookimpl
 def conda_request_headers():
+    if not context.plugins.anaconda_telemetry:
+        return
+
     custom_headers = [
         HeaderWrapper(
             header=CondaRequestHeader(
@@ -268,3 +272,12 @@ def conda_request_headers():
         )
 
     yield from validate_headers(custom_headers)
+
+
+@hookimpl
+def conda_settings():
+    yield CondaSetting(
+        name="anaconda_telemetry",
+        description="Whether Anaconda Telemetry is enabled",
+        parameter=PrimitiveParameter(True, element_type=bool),
+    )

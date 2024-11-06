@@ -4,6 +4,7 @@ import pytest
 
 from anaconda_conda_telemetry.hooks import (
     conda_request_headers,
+    conda_settings,
     HEADER_INSTALL,
     HEADER_CHANNELS,
     HEADER_SYS_INFO,
@@ -104,6 +105,17 @@ def test_conda_request_header_with_install(monkeypatch, mocker):
     )
 
 
+def test_conda_request_header_when_disabled(monkeypatch, mocker):
+    """
+    Make sure that nothing is returned when the plugin is disabled via settings
+    """
+    mocker.patch(
+        "anaconda_conda_telemetry.hooks.context.plugins.anaconda_telemetry", False
+    )
+
+    assert not tuple(conda_request_headers())
+
+
 def test_timer_in_info_mode(caplog):
     """
     Ensure the timer decorator works and logs the time taken in INFO mode
@@ -120,3 +132,15 @@ def test_timer_in_info_mode(caplog):
 
     assert "INFO     anaconda_conda_telemetry.hooks" in caplog.text
     assert "function: test; duration (seconds):" in caplog.text
+
+
+def test_conda_settings():
+    """
+    Ensure the correct conda settings are returned
+    """
+    settings = list(conda_settings())
+
+    assert len(settings) == 1
+    assert settings[0].name == "anaconda_telemetry"
+    assert settings[0].description == "Whether Anaconda Telemetry is enabled"
+    assert settings[0].parameter.default.value is True
