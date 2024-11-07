@@ -144,3 +144,20 @@ def test_conda_settings():
     assert settings[0].name == "anaconda_telemetry"
     assert settings[0].description == "Whether Anaconda Telemetry is enabled"
     assert settings[0].parameter.default.value is True
+
+
+def test_conda_request_headers_with_exception(mocker, caplog):
+    """
+    When any exception is encountered, ``conda_request_headers`` should return nothing
+    and log a debug message.
+    """
+    caplog.set_level(logging.DEBUG)
+    mocker.patch(
+        "anaconda_conda_telemetry.hooks.get_sys_info_header_value",
+        side_effect=Exception("Boom"),
+    )
+
+    assert list(conda_request_headers()) == []
+    assert caplog.records[0].levelname == "DEBUG"
+    assert "Failed to collect telemetry data" in caplog.text
+    assert "Exception: Boom" in caplog.text
