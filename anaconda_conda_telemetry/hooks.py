@@ -198,8 +198,7 @@ def validate_headers(
         yield wrapper.header
 
 
-@hookimpl
-def conda_request_headers():
+def _conda_request_headers():
     if not context.plugins.anaconda_telemetry:
         return
 
@@ -272,6 +271,14 @@ def conda_request_headers():
         )
 
     yield from validate_headers(custom_headers)
+
+
+@hookimpl
+def conda_request_headers():
+    try:
+        yield from _conda_request_headers()
+    except Exception as exc:
+        logger.debug("Failed to collect telemetry data", exc_info=exc)
 
 
 @hookimpl
