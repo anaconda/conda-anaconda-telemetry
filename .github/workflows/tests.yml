@@ -117,13 +117,19 @@ jobs:
           clean: true
           fetch-depth: 0
 
+      - uses: conda-incubator/setup-miniconda@d2e6a045a86077fb6cad6f5adf368e9076ddaa8d # v3
+        name: Setup Miniconda
+        with:
+          auto-update-conda: true
+          python-version: 3.12
+          channels: defaults
+
       - name: Build package
         # make sure we don't run on forks
         if: github.repository_owner == 'anaconda'
         id: build
         shell: bash -l {0}
         run: |
-          echo "::group::Setting up environment"
           set -euo pipefail
           conda activate
           conda update --yes --quiet conda
@@ -132,17 +138,10 @@ jobs:
           # see https://github.com/conda/conda/issues/11758
           # see https://github.com/conda/actions/pull/47
           conda install --yes --quiet git
-          echo "::endgroup::"
-
-          echo "::group::Debugging information"
           conda info
           conda config --show-sources
           conda list
-          echo "::endgroup::"
-
-          echo "::group::Building package"
           conda build --croot=./pkgs --override-channels  -c conda-canary/label/dev -c defaults recipe
-          echo "::endgroup::"
 
       - name: Set variables
         id: set-vars
