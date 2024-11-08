@@ -1,0 +1,39 @@
+package:
+  name: conda-anaconda-telemetry
+  version: {{ GIT_DESCRIBE_TAG }}.{{ GIT_BUILD_STR }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  script: {{ PYTHON }} -m pip install --no-build-isolation --no-deps .
+  noarch: python
+
+requirements:
+  host:
+    - pip
+    - python
+    - hatchling
+    - hatch-vcs
+  run:
+    - python
+    - conda-canary/label/dev::conda
+
+test:
+  requires:
+    - conda-canary/label/dev::conda
+    - pip
+  commands:
+    - conda --version
+    - pip check
+  # imports:
+  #   - conda_anaconda_telemetry
+  #   - conda_anaconda_telemetry.hooks
+
+about:
+  home: https://anaconda.org
+  summary: anaconda.org command line client library
+  description: |
+    Anaconda conda telemetry adds telemetry to conda to help us understand how conda is being used.
+  dev_url: https://github.com/anaconda/anaconda-conda-telemetry

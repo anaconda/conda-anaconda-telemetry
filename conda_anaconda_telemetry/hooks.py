@@ -100,7 +100,8 @@ def get_package_list() -> tuple[str, ...]:
     """
     Retrieve the list of packages in the current environment
     """
-    _, packages = list_packages(context.active_prefix, format="canonical")
+    prefix = context.active_prefix or context.root_prefix
+    _, packages = list_packages(prefix, format="canonical")
 
     return packages
 

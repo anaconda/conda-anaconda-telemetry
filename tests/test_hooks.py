@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from anaconda_conda_telemetry.hooks import (
+from conda_anaconda_telemetry.hooks import (
     conda_request_headers,
     conda_settings,
     HEADER_INSTALL,
@@ -18,7 +18,7 @@ from anaconda_conda_telemetry.hooks import (
 @pytest.fixture(autouse=True)
 def packages(mocker):
     """
-    Mocks ``anaconda_conda_telemetry.hooks.list_packages``
+    Mocks ``conda_anaconda_telemetry.hooks.list_packages``
     """
     packages = [
         "defaults/osx-arm64::sqlite-3.45.3-h80987f9_0",
@@ -29,7 +29,7 @@ def packages(mocker):
     def mock_list_packages(*args, **kwargs):
         return 0, packages
 
-    mocker.patch("anaconda_conda_telemetry.hooks.list_packages", mock_list_packages)
+    mocker.patch("conda_anaconda_telemetry.hooks.list_packages", mock_list_packages)
 
     return packages
 
@@ -40,7 +40,7 @@ def test_conda_request_header_default_headers(mocker):
     """
     mock_argparse_args = mocker.MagicMock(match_spec="package", cmd="search")
     mocker.patch(
-        "anaconda_conda_telemetry.hooks.context._argparse_args", mock_argparse_args
+        "conda_anaconda_telemetry.hooks.context._argparse_args", mock_argparse_args
     )
     headers = {header.name: header for header in tuple(conda_request_headers())}
 
@@ -64,7 +64,7 @@ def test_conda_request_header_with_search(monkeypatch, mocker):
     monkeypatch.setattr("sys.argv", ["conda", "search", "package"])
     mock_argparse_args = mocker.MagicMock(match_spec="package", cmd="search")
     mocker.patch(
-        "anaconda_conda_telemetry.hooks.context._argparse_args", mock_argparse_args
+        "conda_anaconda_telemetry.hooks.context._argparse_args", mock_argparse_args
     )
 
     header_names = {header.name for header in tuple(conda_request_headers())}
@@ -88,7 +88,7 @@ def test_conda_request_header_with_install(monkeypatch, mocker):
     monkeypatch.setattr("sys.argv", ["conda", "install", "package"])
     mock_argparse_args = mocker.MagicMock(packages=["package"], cmd="install")
     mocker.patch(
-        "anaconda_conda_telemetry.hooks.context._argparse_args", mock_argparse_args
+        "conda_anaconda_telemetry.hooks.context._argparse_args", mock_argparse_args
     )
 
     header_names = {header.name for header in tuple(conda_request_headers())}
@@ -110,7 +110,7 @@ def test_conda_request_header_when_disabled(monkeypatch, mocker):
     Make sure that nothing is returned when the plugin is disabled via settings
     """
     mocker.patch(
-        "anaconda_conda_telemetry.hooks.context.plugins.anaconda_telemetry", False
+        "conda_anaconda_telemetry.hooks.context.plugins.anaconda_telemetry", False
     )
 
     assert not tuple(conda_request_headers())
@@ -130,7 +130,7 @@ def test_timer_in_info_mode(caplog):
 
     assert caplog.records[0].levelname == "INFO"
 
-    assert "INFO     anaconda_conda_telemetry.hooks" in caplog.text
+    assert "INFO     conda_anaconda_telemetry.hooks" in caplog.text
     assert "function: test; duration (seconds):" in caplog.text
 
 
@@ -153,7 +153,7 @@ def test_conda_request_headers_with_exception(mocker, caplog):
     """
     caplog.set_level(logging.DEBUG)
     mocker.patch(
-        "anaconda_conda_telemetry.hooks.get_sys_info_header_value",
+        "conda_anaconda_telemetry.hooks.get_sys_info_header_value",
         side_effect=Exception("Boom"),
     )
 

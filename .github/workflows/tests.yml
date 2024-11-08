@@ -9,7 +9,35 @@ on:
       - main
 
 jobs:
-  build:
+  # detect whether any code changes are included in this PR
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      # necessary to detect changes
+      # https://github.com/dorny/paths-filter#supported-workflows
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v3
+        # dorny/paths-filter needs git clone for push events
+        # https://github.com/dorny/paths-filter#supported-workflows
+        if: github.event_name != 'pull_request'
+      - uses: dorny/paths-filter@v2.11.1
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'conda_anaconda_telemetry/**'
+              - 'tests/**'
+              - '*.py'
+              - 'conda.recipe/**'
+              - '.github/workflows/tests.yml'
+
+  tests:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -39,3 +67,38 @@ jobs:
       - name: Test with pytest
         run: |
           conda run --name test pytest --doctest-modules
+
+  build:
+    name: Canary Build
+    needs: [tests]
+    # only build canary build if
+    # - prior steps succeeded,
+    # - this is the main branch
+    if: >-
+      success()
+      && !github.event.repository.fork
+      && github.ref_name == 'main'
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            subdir: noarch
+    runs-on: ${{ matrix.runner }}
+    steps:
+      # Clean checkout of specific git ref needed for package metadata version
+      # which needs env vars GIT_DESCRIBE_TAG and GIT_BUILD_STR:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
+          clean: true
+          fetch-depth: 0
+
+      - name: Create and upload canary build
+        uses: conda/actions/canary-release@v23.3.0
+        with:
+          package-name: ${{ github.event.repository.name }}
+          subdir: ${{ matrix.subdir }}
+          anaconda-org-channel: distribution-plugins
+          anaconda-org-label: ${{ github.ref_name == 'main' && 'dev' || format('{0}-{1}', github.event.repository.name, github.ref_name) }}
+          anaconda-org-token: ${{ secrets.ANACONDA_ORG_TOKEN }}
+          conda-build-arguments: '--override-channels  -c conda-canary/label/dev -c defaults'
