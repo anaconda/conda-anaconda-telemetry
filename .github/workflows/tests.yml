@@ -26,6 +26,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
+env:
+  # https://conda.github.io/conda-libmamba-solver/user-guide/configuration/#advanced-options
+  CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED: true
+
+
 jobs:
   # detect whether any code changes are included in this PR
   changes:
@@ -117,6 +122,9 @@ jobs:
 
       - name: Create & Upload
         uses: conda/actions/canary-release@15f883f14f4232f83658e3609c3316d58905138f # v24.8.0
+        env:
+          # Run conda-build in isolated activation to properly package conda
+          _CONDA_BUILD_ISOLATED_ACTIVATION: 1
         with:
           package-name: ${{ github.event.repository.name }}
           subdir: ${{ matrix.subdir }}
