@@ -1,5 +1,7 @@
+conda-forge::conda-build
 conda-forge::darker
 conda-forge::flake8
+conda-forge::hatchling
 conda-forge::mypy
 conda-forge::pyupgrade
 conda-forge::pytest

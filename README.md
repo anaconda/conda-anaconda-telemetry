@@ -1,6 +1,6 @@
-# anaconda-conda-telemetry
+# conda-anaconda-telemetry
 
-Conda telemetry for Anaconda
+Anaconda Telemetry for conda
 
 ## Development
 

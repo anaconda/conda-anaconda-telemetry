@@ -163,3 +163,4 @@ cython_debug/
 
 # conda development environment
 ./env
+.channel/

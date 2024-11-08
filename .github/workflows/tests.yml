@@ -1,32 +1,83 @@
-name: anaconda-conda-telemetry tests
+name: Tests
 
 on:
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#push
   push:
     branches:
       - main
+
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request
   pull_request:
-    branches:
-      - main
+
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#workflow_dispatch
+  workflow_dispatch:
+
+  # no payload
+  schedule:
+      # https://crontab.guru/#37_18_*_*_*
+    - cron: 37 18 * * *
+
+concurrency:
+  # Concurrency group that uses the workflow name and PR number if available
+  # or commit SHA as a fallback. If a new build is triggered under that
+  # concurrency group while a previous build is running it will be canceled.
+  # Repeated pushes to a PR will cancel all previous builds, while multiple
+  # merges to main will not cancel.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  # https://conda.github.io/conda-libmamba-solver/user-guide/configuration/#advanced-options
+  CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED: true
+
 
 jobs:
-  build:
+  # detect whether any code changes are included in this PR
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      # necessary to detect changes
+      # https://github.com/dorny/paths-filter#supported-workflows
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        # dorny/paths-filter needs git clone for non-PR events
+        # https://github.com/dorny/paths-filter#supported-workflows
+        if: github.event_name != 'pull_request'
+
+      - name: Filter Changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'conda_anaconda_telemetry/**'
+              - 'tests/**'
+              - '*.py'
+              - 'conda.recipe/**'
+              - '.github/workflows/tests.yml'
+
+  tests:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.8", "3.12"]
+        python-version: ["3.9", "3.12"]
         os: ["macos-latest", "ubuntu-latest", "windows-latest"]
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
-        with:
-          python-version: ${{ matrix.python-version }}
       - uses: conda-incubator/setup-miniconda@d2e6a045a86077fb6cad6f5adf368e9076ddaa8d # v3
         name: Setup Miniconda
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
+          channels: defaults
       - name: Install dependencies (conda)
         run: |
           conda env update --file environment.yaml --name test
@@ -39,3 +90,42 @@ jobs:
       - name: Test with pytest
         run: |
           conda run --name test pytest --doctest-modules
+
+  build:
+    name: Canary Build
+    needs: [tests]
+    # only build canary build if
+    # - prior steps succeeded,
+    # - this is the main branch
+    if: >-
+      success()
+      && !github.event.repository.fork
+      && github.ref_name == 'main'
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            subdir: noarch
+    runs-on: ${{ matrix.runner }}
+    steps:
+      # Clean checkout of specific git ref needed for package metadata version
+      # which needs env vars GIT_DESCRIBE_TAG and GIT_BUILD_STR:
+      - name: Checkout Source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.ref }}
+          clean: true
+          fetch-depth: 0
+
+      - name: Create & Upload
+        uses: conda/actions/canary-release@15f883f14f4232f83658e3609c3316d58905138f # v24.8.0
+        env:
+          # Run conda-build in isolated activation to properly package conda
+          _CONDA_BUILD_ISOLATED_ACTIVATION: 1
+        with:
+          package-name: ${{ github.event.repository.name }}
+          subdir: ${{ matrix.subdir }}
+          anaconda-org-channel: distribution-plugins
+          anaconda-org-label: ${{ github.ref_name == 'main' && 'dev' || format('{0}-{1}', github.event.repository.name, github.ref_name) }}
+          anaconda-org-token: ${{ secrets.ANACONDA_ORG_TOKEN }}
+          conda-build-arguments: '--override-channels  -c conda-canary/label/dev -c defaults'

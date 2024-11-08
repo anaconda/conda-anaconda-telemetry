@@ -7,7 +7,7 @@ receivers:
 exporters:
   elasticsearch:
     endpoint: http://elasticsearch:9200
-    traces_index: anaconda-conda-telemetry
+    traces_index: conda-anaconda-telemetry
     auth:
       authenticator: basicauth
 
