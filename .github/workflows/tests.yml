@@ -130,7 +130,7 @@ jobs:
         id: build
         shell: bash -l {0}
         env:
-          # Run conda-build in isolated activation to properly package conda
+          # Run conda-build in isolated activation to properly package the software
           _CONDA_BUILD_ISOLATED_ACTIVATION: 1
         run: |
           set -euo pipefail
