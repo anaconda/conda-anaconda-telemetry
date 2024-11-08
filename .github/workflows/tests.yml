@@ -93,7 +93,6 @@ jobs:
           conda run --name test pytest --doctest-modules
 
   build:
-    name: Canary Build
     needs: [tests]
     # only build canary build if
     # - prior steps succeeded,
@@ -118,15 +117,58 @@ jobs:
           clean: true
           fetch-depth: 0
 
-      - name: Create & Upload
-        uses: conda/actions/canary-release@15f883f14f4232f83658e3609c3316d58905138f # v24.8.0
-        env:
-          # Run conda-build in isolated activation to properly package conda
-          _CONDA_BUILD_ISOLATED_ACTIVATION: 1
-        with:
-          package-name: ${{ github.event.repository.name }}
-          subdir: ${{ matrix.subdir }}
-          anaconda-org-channel: distribution-plugins
-          anaconda-org-label: ${{ github.ref_name == 'main' && 'dev' || format('{0}-{1}', github.event.repository.name, github.ref_name) }}
-          anaconda-org-token: ${{ secrets.ANACONDA_ORG_TOKEN }}
-          conda-build-arguments: '--override-channels  -c conda-canary/label/dev -c defaults'
+      - name: Build package
+        # make sure we don't run on forks
+        if: github.repository_owner == 'anaconda'
+        id: build
+        shell: bash -l {0}
+        run: |
+          echo "::group::Setting up environment"
+          set -euo pipefail
+          conda activate
+          conda update --yes --quiet conda
+          conda install --yes --quiet conda-build anaconda-client
+          # git needs to be installed after conda-build
+          # see https://github.com/conda/conda/issues/11758
+          # see https://github.com/conda/actions/pull/47
+          conda install --yes --quiet git
+          echo "::endgroup::"
+
+          echo "::group::Debugging information"
+          conda info
+          conda config --show-sources
+          conda list
+          echo "::endgroup::"
+
+          echo "::group::Building package"
+          conda build --croot=./pkgs --override-channels  -c conda-canary/label/dev -c defaults recipe
+          echo "::endgroup::"
+
+      - name: Set variables
+        id: set-vars
+        run: |
+          echo "PACKAGE_LABEL=${{ github.ref_name == 'main' && 'dev' || format('{0}-{1}', github.event.repository.name, github.ref_name) }}" >> $GITHUB_ENV
+          echo "PACKAGE_NAME=${{ github.event.repository.name }}" >> $GITHUB_ENV
+
+      - name: Upload package
+        # make sure we don't run on forks
+        if: github.repository_owner == 'anaconda'
+        id: upload
+        shell: bash -l {0}
+        run: |
+          echo "::group::Uploading package"
+          anaconda \
+            --token="${{ secrets.ANACONDA_ORG_TOKEN }}" \
+            upload \
+            --force \
+            --register \
+            --no-progress \
+            --user="distribution-plugins" \
+            --label="$PACKAGE_LABEL" \
+            ./pkgs/${{ matrix.subdir }}/$PACKAGE_NAME-*.tar.bz2
+          echo "Uploaded the following files:"
+          basename -a ./pkgs/${{ matrix.subdir }}/$PACKAGE_NAME-*.tar.bz2
+          echo "::endgroup::"
+
+          echo "Use this command to try out the build:"
+          echo "conda install -c distribution-plugins/label/$PACKAGE_LABEL $PACKAGE_NAME"
