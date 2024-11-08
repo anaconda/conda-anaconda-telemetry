@@ -81,6 +81,7 @@ jobs:
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
+          channels: defaults
       - name: Install dependencies (conda)
         run: |
           conda env update --file environment.yaml --name test
