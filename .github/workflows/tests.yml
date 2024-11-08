@@ -39,6 +39,7 @@ jobs:
       # necessary to detect changes
       # https://github.com/dorny/paths-filter#supported-workflows
       pull-requests: read
+      contents: read
     outputs:
       code: ${{ steps.filter.outputs.code }}
     steps:
