@@ -32,8 +32,8 @@ test:
   #   - conda_anaconda_telemetry.hooks
 
 about:
-  home: https://anaconda.org
-  summary: anaconda.org command line client library
+  home: https://www.anaconda.com
+  summary: Anaconda Telemetry conda plugin
   description: |
-    Anaconda conda telemetry adds telemetry to conda to help us understand how conda is being used.
-  dev_url: https://github.com/anaconda/anaconda-conda-telemetry
+    Anaconda Telemetry for conda adds helps us understand how conda is being used.
+  dev_url: https://github.com/anaconda/conda-anaconda-telemetry

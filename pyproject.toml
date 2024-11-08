@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.entry-points.conda]
-anaconda-conda-telemetry = "conda_anaconda_telemetry.hooks"
+conda-anaconda-telemetry = "conda_anaconda_telemetry.hooks"
 
 [tool.setuptools.packages]
 find = {}
