@@ -76,8 +76,8 @@ def get_virtual_packages() -> tuple[str, ...]:
     Uses the ``conda.base.context.context`` object to retrieve registered virtual packages
     """
     return tuple(
-        f"{package.name}.{package.version}.{package.build}"
-        for package in context.plugin_manager.get_virtual_packages()
+        f"{package.name}={package.version}={package.build}"
+        for package in context.plugin_manager.get_virtual_package_records()
     )
 
 
