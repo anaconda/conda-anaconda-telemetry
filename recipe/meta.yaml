@@ -37,3 +37,4 @@ about:
   description: |
     Anaconda Telemetry for conda adds helps us understand how conda is being used.
   dev_url: https://github.com/anaconda/conda-anaconda-telemetry
+  license: BSD-3-Clause
