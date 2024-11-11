@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "conda-anaconda-telemetry"
-version = "0.1.0"
 description = "A conda plugin for Anaconda telemetry"
-requires-python = ">=3.9"
+readme = "README.md"
+license = {file = "LICENSE"}
 classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
@@ -18,8 +18,12 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy"
 ]
+requires-python = ">=3.9"
 dependencies = [
-  "conda",
+  "conda >=24.9",
+]
+dynamic = [
+  "version"
 ]
 
 [project.entry-points.conda]
