@@ -14,7 +14,7 @@ source develop.sh
 This will create a new environment in the `./env` folder of your project and modifies
 `CONDA_EXE` to point to an isolated version of conda within this environment.
 
-To update this environment when new dependencies are added to `environment.yml`, you
+To update this environment when new dependencies are added to `requirements.txt`, you
 can run the same `source develop.sh` command as above.
 
 ### Setting up OTEL collector and Elastic Search

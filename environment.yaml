@@ -1,5 +1,0 @@
-channels:
-  - defaults
-dependencies:
-  - python>=3.9
-  - conda-canary/label/dev::conda
