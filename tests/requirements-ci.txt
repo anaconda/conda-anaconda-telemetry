@@ -1,0 +1,8 @@
+conda-build
+hatchling
+hatch-vcs
+pip
+pytest
+pytest-cov
+pytest-mock
+pytest-xdist

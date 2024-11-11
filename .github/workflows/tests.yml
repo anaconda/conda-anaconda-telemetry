@@ -72,25 +72,63 @@ jobs:
         os: ["macos-latest", "ubuntu-latest", "windows-latest"]
 
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      # Clean checkout of specific git ref needed for package metadata version
+      # which needs env vars GIT_DESCRIBE_TAG and GIT_BUILD_STR:
+      - name: Checkout Source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.ref }}
+          clean: true
+          fetch-depth: 0
+
+      - name: Hash + Timestamp
+        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
+
+      - name: Cache Conda
+        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
+        with:
+          path: ~/conda_pkgs_dir
+          key: cache-${{ env.HASH }}
+
       - uses: conda-incubator/setup-miniconda@d2e6a045a86077fb6cad6f5adf368e9076ddaa8d # v3
         name: Setup Miniconda
         with:
-          auto-update-conda: true
           python-version: ${{ matrix.python-version }}
           channels: defaults
-      - name: Install dependencies (conda)
-        run: |
-          conda env update --file environment.yaml --name test
-          conda install --name test --file requirements.dev.txt
-          conda run --name test pip install -e .
-      - name: Conda info
-        run: |
-          conda info
-          conda list --name test
-      - name: Test with pytest
-        run: |
-          conda run --name test pytest --doctest-modules
+          run-post: false  # skip post cleanup
+
+      - name: Conda Install
+        run: >
+          conda install
+          --name test
+          --yes
+          --file tests/requirements.txt
+          --file tests/requirements-ci.txt
+          python=${{ matrix.python-version }}
+
+      # TODO: how can we remove this step?
+      - name: Install Self
+        run: conda run --name test pip install --no-build-isolation --no-deps e .
+
+      - name: Conda Info
+        run: conda info --verbose
+
+      - name: Conda Config
+        run: conda config --show-sources
+
+      - name: Conda List
+        run: conda list --show-channel-urls --name test
+
+      - name: Run Tests
+        # Windows is sensitive to long paths, using `--basetemp=${{ runner.temp }} to
+        # keep the test directories shorter
+        run: >
+          conda run --name test
+          pytest
+          --doctest-modules
+          --cov=conda_anaconda_telemetry
+          --basetemp=${{ runner.temp }}
+          -n auto
 
   build:
     needs: [tests]
@@ -100,12 +138,13 @@ jobs:
     if: >-
       success()
       && !github.event.repository.fork
-      && github.ref_name == 'main'
     strategy:
       matrix:
         include:
           - runner: ubuntu-latest
             subdir: noarch
+            python-version: 3.12
+
     runs-on: ${{ matrix.runner }}
     steps:
       # Clean checkout of specific git ref needed for package metadata version
@@ -117,12 +156,24 @@ jobs:
           clean: true
           fetch-depth: 0
 
+      - name: Hash + Timestamp
+        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
+
+      - name: Cache Conda
+        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
+        with:
+          path: ~/conda_pkgs_dir
+          key: cache-${{ env.HASH }}
+
       - uses: conda-incubator/setup-miniconda@d2e6a045a86077fb6cad6f5adf368e9076ddaa8d # v3
         name: Setup Miniconda
         with:
-          auto-update-conda: true
-          python-version: 3.12
+          python-version: ${{ matrix.python-version }}
           channels: defaults
+          run-post: false  # skip post cleanup
+          # conda not preinstalled in arm64 runners
+          miniconda-version: ${{ runner.arch == 'ARM64' && 'latest' || null }}
+          architecture: ${{ runner.arch }}
 
       - name: Build package
         # make sure we don't run on forks
@@ -134,8 +185,7 @@ jobs:
           _CONDA_BUILD_ISOLATED_ACTIVATION: 1
         run: |
           set -euo pipefail
-          conda activate
-          conda update --yes --quiet conda
+          conda activate test
           conda install --yes --quiet conda-build anaconda-client
           # git needs to be installed after conda-build
           # see https://github.com/conda/conda/issues/11758
@@ -144,7 +194,7 @@ jobs:
           conda info
           conda config --show-sources
           conda list
-          conda build --croot=./pkgs --override-channels  -c conda-canary/label/dev -c defaults recipe
+          conda build --croot=${{ runner.temp }}/pkgs --override-channels  -c conda-canary/label/dev -c defaults recipe
 
       - name: Set variables
         id: set-vars
@@ -153,8 +203,8 @@ jobs:
           echo "PACKAGE_NAME=${{ github.event.repository.name }}" >> $GITHUB_ENV
 
       - name: Upload package
-        # make sure we don't run on forks
-        if: github.repository_owner == 'anaconda'
+        # make sure we don't run in branches
+        if: github.ref_name == 'main'
         id: upload
         shell: bash -l {0}
         run: |
@@ -167,7 +217,7 @@ jobs:
             --no-progress \
             --user="distribution-plugins" \
             --label="$PACKAGE_LABEL" \
-            ./pkgs/${{ matrix.subdir }}/$PACKAGE_NAME-*.tar.bz2
+            ${{ runner.temp }}/pkgs/${{ matrix.subdir }}/$PACKAGE_NAME-*.tar.bz2
           echo "Uploaded the following files:"
           basename -a ./pkgs/${{ matrix.subdir }}/$PACKAGE_NAME-*.tar.bz2
           echo "::endgroup::"
