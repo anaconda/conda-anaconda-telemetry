@@ -144,7 +144,7 @@ jobs:
           conda info
           conda config --show-sources
           conda list
-          conda build --croot=./pkgs --override-channels  -c conda-canary/label/dev -c defaults recipe
+          conda build --croot=${{ runner.temp }}/pkgs --override-channels  -c conda-canary/label/dev -c defaults recipe
 
       - name: Set variables
         id: set-vars
@@ -167,7 +167,7 @@ jobs:
             --no-progress \
             --user="distribution-plugins" \
             --label="$PACKAGE_LABEL" \
-            ./pkgs/${{ matrix.subdir }}/$PACKAGE_NAME-*.tar.bz2
+            ${{ runner.temp }}/pkgs/${{ matrix.subdir }}/$PACKAGE_NAME-*.tar.bz2
           echo "Uploaded the following files:"
           basename -a ./pkgs/${{ matrix.subdir }}/$PACKAGE_NAME-*.tar.bz2
           echo "::endgroup::"
