@@ -1,7 +1,7 @@
 # renovate: datasource=conda depName=main/conda-build
 conda-build >=24.9.0
 # renovate: datasource=conda depName=main/hatchling
-hatchling ==1.25.0
+hatchling ==1.26.1
 # renovate: datasource=conda depName=main/hatch-vcs
 hatch-vcs ==0.3.0
 # renovate: datasource=conda depName=main/pip
