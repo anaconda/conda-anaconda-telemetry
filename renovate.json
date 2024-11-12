@@ -13,7 +13,6 @@
         "(^|/)requirements(.*).txt$"
       ],
       "matchStrings": [
-        "#\\s*renovate\\s+datasource=conda\\s+depName=(?<depName>.*?)\\s+-\\s*[\\w-]+\\s*==?\\s*\"?(?<currentValue>.*)\"?",
         "# renovate: datasource=conda depName=(?<depName>.*?)\\s+-\\s*[\\w-]+\\s*==?\\s*\"?(?<currentValue>.*)\"?"
       ],
       "datasourceTemplate": "conda"
