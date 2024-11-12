@@ -3,7 +3,7 @@ conda-build >=24.9.0
 # renovate: datasource=conda depName=main/hatchling
 hatchling ==1.25.0
 # renovate: datasource=conda depName=main/hatch-vcs
-hatch-vcs ==0.3.0
+hatch-vcs ==0.4.0
 # renovate: datasource=conda depName=main/pip
 pip ==24.2
 # renovate: datasource=conda depName=main/pytest
