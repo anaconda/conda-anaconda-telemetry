@@ -207,36 +207,28 @@ def _conda_request_headers():
         HeaderWrapper(
             header=CondaRequestHeader(
                 name=HEADER_SYS_INFO,
-                description="Custom headers used to submit telemetry data",
                 value=get_sys_info_header_value(),
-                hosts=REQUEST_HEADER_HOSTS,
             ),
             size_limit=500,
         ),
         HeaderWrapper(
             header=CondaRequestHeader(
                 name=HEADER_CHANNELS,
-                description="Header which exposes the channel URLs currently in use",
                 value=get_channel_urls_header_value(),
-                hosts=REQUEST_HEADER_HOSTS,
             ),
             size_limit=500,
         ),
         HeaderWrapper(
             header=CondaRequestHeader(
                 name=HEADER_VIRTUAL_PACKAGES,
-                description="Header which exposes the virtual packages currently in use",
                 value=get_virtual_packages_header_value(),
-                hosts=REQUEST_HEADER_HOSTS,
             ),
             size_limit=500,
         ),
         HeaderWrapper(
             header=CondaRequestHeader(
                 name=HEADER_PACKAGES,
-                description="Header which exposes the currently installed packages",
                 value=get_installed_packages_header_value(),
-                hosts=REQUEST_HEADER_HOSTS,
             ),
             size_limit=5_000,
         ),
@@ -249,9 +241,7 @@ def _conda_request_headers():
             HeaderWrapper(
                 header=CondaRequestHeader(
                     name=HEADER_SEARCH,
-                    description="Header which exposes what is being searched for",
                     value=get_search_term(),
-                    hosts=REQUEST_HEADER_HOSTS,
                 ),
                 size_limit=500,
             )
@@ -262,10 +252,7 @@ def _conda_request_headers():
             HeaderWrapper(
                 header=CondaRequestHeader(
                     name=HEADER_INSTALL,
-                    description="Header which exposes what is currently being installed as "
-                    "specified on the command line",
                     value=get_install_arguments_header_value(),
-                    hosts=REQUEST_HEADER_HOSTS,
                 ),
                 size_limit=500,
             )
@@ -275,9 +262,10 @@ def _conda_request_headers():
 
 
 @hookimpl
-def conda_request_headers():
+def conda_session_headers(host: str):
     try:
-        yield from _conda_request_headers()
+        if host in REQUEST_HEADER_HOSTS:
+            yield from _conda_request_headers()
     except Exception as exc:
         logger.debug("Failed to collect telemetry data", exc_info=exc)
 
