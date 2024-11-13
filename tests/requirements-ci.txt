@@ -1,8 +1,16 @@
-conda-build
-hatchling
-hatch-vcs
-pip
-pytest
-pytest-cov
-pytest-mock
-pytest-xdist
+# renovate: datasource=conda depName=main/conda-build
+conda-build >=24.9.0
+# renovate: datasource=conda depName=main/hatchling
+hatchling ==1.25.0
+# renovate: datasource=conda depName=main/hatch-vcs
+hatch-vcs ==0.3.0
+# renovate: datasource=conda depName=main/pip
+pip ==24.2
+# renovate: datasource=conda depName=main/pytest
+pytest ==7.4.4
+# renovate: datasource=conda depName=main/pytest-cov
+pytest-cov ==4.1.0
+# renovate: datasource=conda depName=main/pytest-mock
+pytest-mock ==3.10.0
+# renovate: datasource=conda depName=main/pytest-xdist
+pytest-xdist ==3.5.0
