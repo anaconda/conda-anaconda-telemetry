@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from conda_anaconda_telemetry.hooks import (
-    conda_request_headers,
+    conda_session_headers,
     conda_settings,
     HEADER_INSTALL,
     HEADER_CHANNELS,
@@ -13,6 +13,9 @@ from conda_anaconda_telemetry.hooks import (
     HEADER_SEARCH,
     timer,
 )
+
+#: Host used across all tests
+TEST_HOST = "repo.anaconda.com"
 
 
 @pytest.fixture(autouse=True)
@@ -42,7 +45,9 @@ def test_conda_request_header_default_headers(mocker):
     mocker.patch(
         "conda_anaconda_telemetry.hooks.context._argparse_args", mock_argparse_args
     )
-    headers = {header.name: header for header in tuple(conda_request_headers())}
+    headers = {
+        header.name: header for header in tuple(conda_session_headers(TEST_HOST))
+    }
 
     expected_header_names_values = {
         HEADER_SYS_INFO: "",
@@ -67,7 +72,7 @@ def test_conda_request_header_with_search(monkeypatch, mocker):
         "conda_anaconda_telemetry.hooks.context._argparse_args", mock_argparse_args
     )
 
-    header_names = {header.name for header in tuple(conda_request_headers())}
+    header_names = {header.name for header in tuple(conda_session_headers(TEST_HOST))}
     expected_header_names = {
         HEADER_SYS_INFO,
         HEADER_CHANNELS,
@@ -91,7 +96,7 @@ def test_conda_request_header_with_install(monkeypatch, mocker):
         "conda_anaconda_telemetry.hooks.context._argparse_args", mock_argparse_args
     )
 
-    header_names = {header.name for header in tuple(conda_request_headers())}
+    header_names = {header.name for header in tuple(conda_session_headers(TEST_HOST))}
     expected_header_names = {
         HEADER_SYS_INFO,
         HEADER_CHANNELS,
@@ -112,8 +117,7 @@ def test_conda_request_header_when_disabled(monkeypatch, mocker):
     mocker.patch(
         "conda_anaconda_telemetry.hooks.context.plugins.anaconda_telemetry", False
     )
-
-    assert not tuple(conda_request_headers())
+    assert not tuple(conda_session_headers(TEST_HOST))
 
 
 def test_timer_in_info_mode(caplog):
@@ -146,9 +150,9 @@ def test_conda_settings():
     assert settings[0].parameter.default.value is True
 
 
-def test_conda_request_headers_with_exception(mocker, caplog):
+def test_conda_session_headers_with_exception(mocker, caplog):
     """
-    When any exception is encountered, ``conda_request_headers`` should return nothing
+    When any exception is encountered, ``conda_session_headers`` should return nothing
     and log a debug message.
     """
     caplog.set_level(logging.DEBUG)
@@ -157,7 +161,15 @@ def test_conda_request_headers_with_exception(mocker, caplog):
         side_effect=Exception("Boom"),
     )
 
-    assert list(conda_request_headers()) == []
+    assert list(conda_session_headers(TEST_HOST)) == []
     assert caplog.records[0].levelname == "DEBUG"
     assert "Failed to collect telemetry data" in caplog.text
     assert "Exception: Boom" in caplog.text
+
+
+def test_conda_session_headers_with_non_matching_url(mocker, caplog):
+    """
+    When any exception is encountered, ``conda_session_headers`` should return nothing
+    and log a debug message.
+    """
+    assert list(conda_session_headers("https://example.com")) == []
