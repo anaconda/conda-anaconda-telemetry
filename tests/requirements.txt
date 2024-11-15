@@ -1,2 +1,2 @@
-conda-canary/label/dev::conda
+conda >24.9.2
 python >=3.9
