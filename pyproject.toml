@@ -48,11 +48,8 @@ sort = "Miss"
 # store relative paths in coverage information
 relative_files = true
 
-[tool.hatch.build.targets.wheel]
-packages = ["anaconda_conda_telemetry"]
-
 [tool.hatch.build.hooks.vcs]
-version-file = "anaconda_conda_telemetry/_version.py"
+version-file = "conda_anaconda_telemetry/_version.py"
 
 [tool.hatch.version]
 source = "vcs"
@@ -63,7 +60,7 @@ local_scheme = "dirty-tag"
 [tool.pytest.ini_options]
 addopts = [
   "--color=yes",
-  # "--cov=anaconda_conda_telemetry",  # passed in test runner scripts instead (avoid debugger)
+  # "--cov=conda_anaconda_telemetry",  # passed in test runner scripts instead (avoid debugger)
   "--cov-report=term",  # print summary table to screen
   "--cov-report=xml",  # for codecov/codecov-action upload
   "--tb=native",
@@ -110,4 +107,4 @@ select = [
 ]
 
 [tool.setuptools]
-packages = ["anaconda_conda_telemetry"]
+packages = ["conda_anaconda_telemetry"]

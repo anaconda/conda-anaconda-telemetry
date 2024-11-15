@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from typing import Final
 
 #: Application name.
-APP_NAME: Final = "anaconda-conda-telemetry"
+APP_NAME: Final = "conda-anaconda-telemetry"
 
 try:
     from ._version import __version__
