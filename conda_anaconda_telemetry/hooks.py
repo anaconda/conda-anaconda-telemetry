@@ -175,7 +175,7 @@ def validate_headers(
     Any headers over their individual limits will be truncated.
     """
     total_max_size = sum(header.size_limit for header in custom_headers)
-    if total_max_size <= SIZE_LIMIT:
+    if total_max_size > SIZE_LIMIT:
         raise ValueError(
             f"Total header size limited to {SIZE_LIMIT}. "
             f"Exceeded with {total_max_size=}"
@@ -231,7 +231,7 @@ def _conda_request_headers() -> Iterator[HeaderWrapper]:
             )
         )
 
-    if command in {"install", "create"}:
+    elif command in {"install", "create"}:
         custom_headers.append(
             HeaderWrapper(
                 header=CondaRequestHeader(
