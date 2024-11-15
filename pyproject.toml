@@ -31,6 +31,12 @@ conda-anaconda-telemetry = "conda_anaconda_telemetry.hooks"
 
 [tool.setuptools.packages]
 find = {}
+[tool.hatch.build.hooks.vcs]
+version-file = "anaconda_conda_telemetry/_version.py"
 
 [tool.hatch.version]
 source = "vcs"
+
+[tool.hatch.version.raw-options]
+local_scheme = "dirty-tag"
+
