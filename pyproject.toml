@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "conda-anaconda-telemetry"
-description = "A conda plugin for Anaconda telemetry"
+description = "A conda plugin for Anaconda Telemetry"
 readme = "README.md"
 license = {file = "LICENSE"}
 classifiers = [
