@@ -19,11 +19,7 @@ services:
         soft: -1
         hard: -1
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl --output /dev/null --silent --head --fail -u elastic:${ES_LOCAL_PASSWORD} http://elasticsearch:${ES_LOCAL_PORT}",
-        ]
+      test: [CMD-SHELL, 'curl --output /dev/null --silent --head --fail -u elastic:${ES_LOCAL_PASSWORD} http://elasticsearch:${ES_LOCAL_PORT}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -34,7 +30,7 @@ services:
         condition: service_healthy
     image: docker.elastic.co/elasticsearch/elasticsearch:${ES_LOCAL_VERSION}
     container_name: ${KIBANA_SETTINGS_LOCAL_CONTAINER_NAME}
-    restart: 'no'
+    restart: no
     command: >
       bash -c '
         echo "Setup the kibana_system password";
@@ -59,11 +55,7 @@ services:
       - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY}
       - ELASTICSEARCH_PUBLICBASEURL=http://localhost:${ES_LOCAL_PORT}
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl -s -I http://kibana:5601 | grep -q 'HTTP/1.1 302 Found'",
-        ]
+      test: [CMD-SHELL, curl -s -I http://kibana:5601 | grep -q 'HTTP/1.1 302 Found']
       interval: 10s
       timeout: 10s
       retries: 20

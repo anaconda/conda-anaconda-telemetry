@@ -1,3 +1,5 @@
+"""Conda plugin that adds telemetry headers to requests made by conda."""
+
 from __future__ import annotations
 
 import functools
@@ -6,19 +8,20 @@ import time
 import typing
 
 from conda.base.context import context
-from conda.common.configuration import PrimitiveParameter
 from conda.cli.main_list import list_packages
+from conda.common.configuration import PrimitiveParameter
 from conda.common.url import mask_anaconda_token
 from conda.models.channel import all_channel_urls
-from conda.plugins import hookimpl, CondaRequestHeader, CondaSetting
+from conda.plugins import CondaRequestHeader, CondaSetting, hookimpl
 
 try:
-    from conda_build import __version__ as CONDA_BUILD_VERSION
+    from conda_build import __version__ as conda_build_version
 except ImportError:
-    CONDA_BUILD_VERSION = "n/a"
+    conda_build_version = "n/a"
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
+    from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -53,16 +56,21 @@ HEADER_SYS_INFO = f"{HEADER_PREFIX}-Sys-Info"
 REQUEST_HEADER_HOSTS = {"repo.anaconda.com", "conda.anaconda.org"}
 
 
-def timer(func):
+def timer(func: Callable) -> Callable:
+    """Log the duration of a function call."""
+
     @functools.wraps(func)
-    def wrapper_timer(*args, **kwargs):
+    def wrapper_timer(*args: tuple, **kwargs: dict) -> Callable:
+        """Wrap the given function."""
         if logger.getEffectiveLevel() <= logging.INFO:
             tic = time.perf_counter()
             value = func(*args, **kwargs)
             toc = time.perf_counter()
             elapsed_time = toc - tic
             logger.info(
-                f"function: {func.__name__}; duration (seconds): {elapsed_time:0.4f}"
+                "function: %s; duration (seconds): %0.4f",
+                func.__name__,
+                elapsed_time=elapsed_time,
             )
             return value
 
@@ -72,9 +80,7 @@ def timer(func):
 
 
 def get_virtual_packages() -> tuple[str, ...]:
-    """
-    Uses the ``conda.base.context.context`` object to retrieve registered virtual packages
-    """
+    """Retrieve the registered virtual packages from conda's context."""
     return tuple(
         f"{package.name}={package.version}={package.build}"
         for package in context.plugin_manager.get_virtual_package_records()
@@ -82,24 +88,18 @@ def get_virtual_packages() -> tuple[str, ...]:
 
 
 def get_channel_urls() -> tuple[str, ...]:
-    """
-    Returns a list of currently configured channel URLs with tokens masked
-    """
+    """Return a list of currently configured channel URLs with tokens masked."""
     channels = list(all_channel_urls(context.channels))
     return tuple(mask_anaconda_token(c) for c in channels)
 
 
 def get_conda_command() -> str:
-    """
-    Use ``sys.argv`` to determine the conda command that is current being run
-    """
+    """Use ``sys.argv`` to determine the conda command that is current being run."""
     return context._argparse_args.cmd
 
 
 def get_package_list() -> tuple[str, ...]:
-    """
-    Retrieve the list of packages in the current environment
-    """
+    """Retrieve the list of packages in the current environment."""
     prefix = context.active_prefix or context.root_prefix
     _, packages = list_packages(prefix, format="canonical")
 
@@ -107,27 +107,21 @@ def get_package_list() -> tuple[str, ...]:
 
 
 def get_search_term() -> str:
-    """
-    Retrieve the search term being used when search command is run
-    """
+    """Retrieve the search term being used when search command is run."""
     return context._argparse_args.match_spec
 
 
 def get_install_arguments() -> tuple[str, ...]:
-    """
-    Get the position argument which have specified via the ``install`` or ``create`` commands
-    """
+    """Get the parsed position argument."""
     return context._argparse_args.packages
 
 
 @timer
 @functools.lru_cache(None)
 def get_sys_info_header_value() -> str:
-    """
-    Return ``;`` delimited string of extra system information
-    """
+    """Return ``;`` delimited string of extra system information."""
     telemetry_data = {
-        "conda_build_version": CONDA_BUILD_VERSION,
+        "conda_build_version": conda_build_version,
         "conda_command": get_conda_command(),
     }
 
@@ -139,43 +133,33 @@ def get_sys_info_header_value() -> str:
 @timer
 @functools.lru_cache(None)
 def get_channel_urls_header_value() -> str:
-    """
-    Return ``FIELD_SEPARATOR`` delimited string of channel URLs
-    """
+    """Return ``FIELD_SEPARATOR`` delimited string of channel URLs."""
     return FIELD_SEPARATOR.join(get_channel_urls())
 
 
 @timer
 @functools.lru_cache(None)
 def get_virtual_packages_header_value() -> str:
-    """
-    Return ``FIELD_SEPARATOR`` delimited string of virtual packages
-    """
+    """Return ``FIELD_SEPARATOR`` delimited string of virtual packages."""
     return FIELD_SEPARATOR.join(get_virtual_packages())
 
 
 @timer
 @functools.lru_cache(None)
 def get_install_arguments_header_value() -> str:
-    """
-    Return ``FIELD_SEPARATOR`` delimited string of channel URLs
-    """
+    """Return ``FIELD_SEPARATOR`` delimited string of channel URLs."""
     return FIELD_SEPARATOR.join(get_install_arguments())
 
 
 @timer
 @functools.lru_cache(None)
 def get_installed_packages_header_value() -> str:
-    """
-    Return ``FIELD_SEPARATOR`` delimited string of install arguments
-    """
+    """Return ``FIELD_SEPARATOR`` delimited string of install arguments."""
     return FIELD_SEPARATOR.join(get_package_list())
 
 
 class HeaderWrapper(typing.NamedTuple):
-    """
-    Object that wraps ``CondaRequestHeader`` and adds a ``size_limit`` field
-    """
+    """Object that wraps ``CondaRequestHeader`` and adds a ``size_limit`` field."""
 
     header: CondaRequestHeader
     size_limit: int
@@ -184,22 +168,23 @@ class HeaderWrapper(typing.NamedTuple):
 def validate_headers(
     custom_headers: list[HeaderWrapper],
 ) -> Iterator[CondaRequestHeader]:
-    """
-    Makes sure that all headers combined are not larger than ``SIZE_LIMIT``.
+    """Make sure that all headers combined are not larger than ``SIZE_LIMIT``.
 
     Any headers over their individual limits will be truncated.
     """
     total_max_size = sum(header.size_limit for header in custom_headers)
-    assert (
-        total_max_size <= SIZE_LIMIT
-    ), f"Total header size limited to {SIZE_LIMIT}. Exceeded with {total_max_size=}"
+    if total_max_size <= SIZE_LIMIT:
+        raise ValueError(
+            f"Total header size limited to {SIZE_LIMIT}. "
+            f"Exceeded with {total_max_size=}"
+        )
 
     for wrapper in custom_headers:
         wrapper.header.value = wrapper.header.value[: wrapper.size_limit]
         yield wrapper.header
 
 
-def _conda_request_headers():
+def _conda_request_headers() -> Iterator[HeaderWrapper] | None:
     if not context.plugins.anaconda_telemetry:
         return
 
@@ -262,7 +247,8 @@ def _conda_request_headers():
 
 
 @hookimpl
-def conda_session_headers(host: str):
+def conda_session_headers(host: str) -> Iterator[CondaRequestHeader]:
+    """Return a list of custom headers to be included in the request."""
     try:
         if host in REQUEST_HEADER_HOSTS:
             yield from _conda_request_headers()
@@ -271,7 +257,8 @@ def conda_session_headers(host: str):
 
 
 @hookimpl
-def conda_settings():
+def conda_settings() -> Iterator[CondaSetting]:
+    """Return a list of settings that can be configured by the user."""
     yield CondaSetting(
         name="anaconda_telemetry",
         description="Whether Anaconda Telemetry is enabled",

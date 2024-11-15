@@ -6,10 +6,6 @@ requires = [
 ]
 
 [project]
-name = "conda-anaconda-telemetry"
-description = "A conda plugin for Anaconda Telemetry"
-readme = "README.md"
-license = {file = "LICENSE"}
 classifiers = [
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
@@ -19,15 +15,19 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy"
+  "Programming Language :: Python :: Implementation :: PyPy",
 ]
-requires-python = ">=3.9"
 dependencies = [
   "conda >=24.9",
 ]
+description = "A conda plugin for Anaconda Telemetry"
 dynamic = [
-  "version"
+  "version",
 ]
+license = {file = "LICENSE"}
+name = "conda-anaconda-telemetry"
+readme = "README.md"
+requires-python = ">=3.9"
 
 [project.entry-points.conda]
 conda-anaconda-telemetry = "conda_anaconda_telemetry.hooks"
@@ -73,7 +73,7 @@ target-version = "py39"
 
 [tool.ruff.lint]
 extend-per-file-ignores = {"tests/*" = ["D", "S101"]}
-ignore = ["D203", "D213"]
+ignore = ["D203", "D213", "ISC001"]
 # see https://docs.astral.sh/ruff/rules/
 select = [
   "A",  # flake8-builtins
