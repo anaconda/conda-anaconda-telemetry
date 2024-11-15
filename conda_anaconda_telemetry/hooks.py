@@ -70,7 +70,7 @@ def timer(func: Callable) -> Callable:
             logger.info(
                 "function: %s; duration (seconds): %0.4f",
                 func.__name__,
-                elapsed_time=elapsed_time,
+                elapsed_time,
             )
             return value
 
