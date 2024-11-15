@@ -1,3 +1,5 @@
+# Copyright (C) 2024 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 """Conda plugin that adds telemetry headers to requests made by conda."""
 
 from __future__ import annotations
@@ -186,7 +188,7 @@ def validate_headers(
 
 def _conda_request_headers() -> Iterator[HeaderWrapper] | None:
     if not context.plugins.anaconda_telemetry:
-        return
+        return None
 
     custom_headers = [
         HeaderWrapper(
@@ -251,7 +253,9 @@ def conda_session_headers(host: str) -> Iterator[CondaRequestHeader]:
     """Return a list of custom headers to be included in the request."""
     try:
         if host in REQUEST_HEADER_HOSTS:
-            yield from _conda_request_headers()
+            iterator = _conda_request_headers()
+            if iterator is not None:
+                yield from iterator
     except Exception as exc:
         logger.debug("Failed to collect telemetry data", exc_info=exc)
 
