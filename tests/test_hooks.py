@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -14,6 +15,8 @@ from conda_anaconda_telemetry.hooks import (
     HEADER_SEARCH,
     HEADER_SYS_INFO,
     HEADER_VIRTUAL_PACKAGES,
+    SIZE_LIMIT,
+    _conda_request_headers,
     conda_session_headers,
     conda_settings,
     timer,
@@ -189,3 +192,34 @@ def test_conda_session_headers_with_non_matching_url() -> None:
     and log a debug message.
     """
     assert list(conda_session_headers("https://example.com")) == []
+
+
+@pytest.mark.parametrize(
+    "command,argparse_mock",
+    (
+        (
+            ["conda", "install", "package"],
+            MagicMock(packages=["package"], cmd="install"),
+        ),
+        (
+            ["conda", "search", "package"],
+            MagicMock(match_spec=["package"], cmd="search"),
+        ),
+        (["conda", "update", "package"], MagicMock(packages=["package"], cmd="update")),
+    ),
+)
+def test_header_wrapper_size_limit_constraint(
+    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
+    command: list[str],
+    argparse_mock: MagicMock,
+) -> None:
+    """
+    Ensures that the size limit is being adhered to when all ``HeaderWrapper``
+    objects are combined
+    """
+    monkeypatch.setattr("sys.argv", command)
+    mocker.patch("conda_anaconda_telemetry.hooks.context._argparse_args", argparse_mock)
+
+    headers = _conda_request_headers()
+    assert sum(header.size_limit for header in headers) <= SIZE_LIMIT

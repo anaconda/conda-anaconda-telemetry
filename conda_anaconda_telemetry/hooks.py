@@ -22,7 +22,7 @@ except ImportError:
     conda_build_version = "n/a"
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Sequence
     from typing import Callable
 
 logger = logging.getLogger(__name__)
@@ -168,25 +168,18 @@ class HeaderWrapper(typing.NamedTuple):
 
 
 def validate_headers(
-    custom_headers: list[HeaderWrapper],
+    header_wrappers: Sequence[HeaderWrapper],
 ) -> Iterator[CondaRequestHeader]:
     """Make sure that all headers combined are not larger than ``SIZE_LIMIT``.
 
     Any headers over their individual limits will be truncated.
     """
-    total_max_size = sum(header.size_limit for header in custom_headers)
-    if total_max_size > SIZE_LIMIT:
-        raise ValueError(
-            f"Total header size limited to {SIZE_LIMIT}. "
-            f"Exceeded with {total_max_size=}"
-        )
-
-    for wrapper in custom_headers:
+    for wrapper in header_wrappers:
         wrapper.header.value = wrapper.header.value[: wrapper.size_limit]
         yield wrapper.header
 
 
-def _conda_request_headers() -> Iterator[HeaderWrapper]:
+def _conda_request_headers() -> Sequence[HeaderWrapper]:
     custom_headers = [
         HeaderWrapper(
             header=CondaRequestHeader(
@@ -242,7 +235,7 @@ def _conda_request_headers() -> Iterator[HeaderWrapper]:
             )
         )
 
-    yield from validate_headers(custom_headers)
+    return custom_headers
 
 
 @hookimpl
@@ -251,7 +244,7 @@ def conda_session_headers(host: str) -> Iterator[CondaRequestHeader]:
     if context.plugins.anaconda_telemetry:
         try:
             if host in REQUEST_HEADER_HOSTS:
-                yield from _conda_request_headers()
+                yield from validate_headers(_conda_request_headers())
         except Exception as exc:
             logger.debug("Failed to collect telemetry data", exc_info=exc)
 
