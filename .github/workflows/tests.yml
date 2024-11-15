@@ -132,7 +132,7 @@ jobs:
       - name: Conda Install
         run: >
           conda install
-          --name test
+          --channel conda-canary/label/dev
           --yes
           --file tests/requirements.txt
           --file tests/requirements-ci.txt
