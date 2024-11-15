@@ -72,7 +72,7 @@ def test_conda_request_header_default_headers(mocker: MockerFixture) -> None:
 
 def test_conda_request_header_with_search(
     monkeypatch: MonkeyPatch, mocker: MockerFixture
-)  -> None:
+) -> None:
     """
     Ensure default headers are returned when conda search is invoked
     """
