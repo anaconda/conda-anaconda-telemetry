@@ -9,6 +9,9 @@ on:
   # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request
   pull_request:
 
+  # https://docs.github.com/en/webhooks/webhook-events-and-payloads#merge_group
+  merge_group:
+
   # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#workflow_dispatch
   workflow_dispatch:
 
@@ -63,13 +66,40 @@ jobs:
 
   tests:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: github.event_name == 'schedule' || needs.changes.outputs.code == 'true'
 
-    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
+        shell: bash -el {0}  # bash exit immediately on error + login shell
+
     strategy:
       matrix:
-        python-version: ["3.9", "3.12"]
-        os: ["macos-latest", "ubuntu-latest", "windows-latest"]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        os: [ubuntu-latest, windows-latest, macos-13, macos-latest]
+        exclude:
+          # Windows: only test lowest and highest Python versions
+          - os: windows-latest
+            python-version: '3.10'
+          - os: windows-latest
+            python-version: '3.11'
+          # macOS x86_64: only test lowest Python version
+          - os: macos-13
+            python-version: '3.10'
+          - os: macos-13
+            python-version: '3.11'
+          - os: macos-13
+            python-version: '3.12'
+          # macOS arm64: only test highest Python version
+          - os: macos-14
+            python-version: '3.9'
+          - os: macos-14
+            python-version: '3.10'
+          - os: macos-14
+            python-version: '3.11'
+    runs-on: ${{ matrix.os }}
+    env:
+      ErrorActionPreference: Stop  # powershell exit immediately on error
 
     steps:
       # Clean checkout of specific git ref needed for package metadata version
@@ -90,10 +120,12 @@ jobs:
           path: ~/conda_pkgs_dir
           key: cache-${{ env.HASH }}
 
-      - uses: conda-incubator/setup-miniconda@d2e6a045a86077fb6cad6f5adf368e9076ddaa8d # v3
-        name: Setup Miniconda
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@d2e6a045a86077fb6cad6f5adf368e9076ddaa8d # v3.1.0
         with:
-          python-version: ${{ matrix.python-version }}
+          # conda not preinstalled in arm64 runners
+          miniconda-version: ${{ runner.arch == 'ARM64' && 'latest' || null }}
+          architecture: ${{ runner.arch }}
           channels: defaults
           run-post: false  # skip post cleanup
 
@@ -108,16 +140,17 @@ jobs:
 
       # TODO: how can we remove this step?
       - name: Install Self
-        run: conda run --name test pip install --no-build-isolation --no-deps e .
+        run: pip install -e .
 
       - name: Conda Info
-        run: conda info --verbose
+        # view test env info (not base)
+        run: python -m conda info --verbose
 
       - name: Conda Config
         run: conda config --show-sources
 
       - name: Conda List
-        run: conda list --show-channel-urls --name test
+        run: conda list --show-channel-urls
 
       - name: Run Tests
         # Windows is sensitive to long paths, using `--basetemp=${{ runner.temp }} to
@@ -130,21 +163,63 @@ jobs:
           --basetemp=${{ runner.temp }}
           -n auto
 
-  build:
+  # required check
+  analyze:
     needs: [tests]
+    if: '!cancelled()'
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine Success
+        uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        id: alls-green
+        with:
+          # permit jobs to be skipped if there are no code changes (see changes job)
+          allowed-skips: ${{ toJSON(needs) }}
+          jobs: ${{ toJSON(needs) }}
+
+      - name: Checkout Source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        # source code is needed to report failures
+        if: always() && github.event_name != 'pull_request' && steps.alls-green.outputs.result == 'failure'
+
+      - name: Report Failures
+        if: always() && github.event_name != 'pull_request' && steps.alls-green.outputs.result == 'failure'
+        uses: JasonEtco/create-an-issue@1b14a70e4d8dc185e5cc76d3bec9eab20257b2c5 # v2.9.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.AUTO_REPORT_TEST_FAILURE }}
+          RUN_ID: ${{ github.run_id }}
+          TITLE: Tests failed
+        with:
+          filename: .github/TEST_FAILURE_REPORT_TEMPLATE.md
+          update_existing: false
+
+  # canary builds
+  build:
+    needs: [analyze]
     # only build canary build if
     # - prior steps succeeded,
-    # - this is the main branch
+    # - this is the main repo, and
+    # - we are on the main, feature, or release branch
     if: >-
-      success()
+      !cancelled()
       && !github.event.repository.fork
+      && (
+        github.ref_name == 'main'
+        || startsWith(github.ref_name, 'feature/')
+        || endsWith(github.ref_name, '.x')
+      )
     strategy:
       matrix:
         include:
           - runner: ubuntu-latest
-            subdir: noarch
-            python-version: 3.12
-
+            subdir: linux-64
+          - runner: macos-13
+            subdir: osx-64
+          - runner: macos-latest
+            subdir: osx-arm64
+          - runner: windows-latest
+            subdir: win-64
     runs-on: ${{ matrix.runner }}
     steps:
       # Clean checkout of specific git ref needed for package metadata version
@@ -156,71 +231,52 @@ jobs:
           clean: true
           fetch-depth: 0
 
-      - name: Hash + Timestamp
-        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
-
-      - name: Cache Conda
-        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
+      # Explicitly use Python 3.11 since each of the OSes has a different default Python
+      - name: Setup Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
         with:
-          path: ~/conda_pkgs_dir
-          key: cache-${{ env.HASH }}
+          python-version: '3.11'
 
-      - uses: conda-incubator/setup-miniconda@d2e6a045a86077fb6cad6f5adf368e9076ddaa8d # v3
-        name: Setup Miniconda
+      - name: Detect Label
+        shell: python
+        run: |
+          import re
+          from pathlib import Path
+          from os import environ
+          from subprocess import check_output
+
+          # unless otherwise specified, commits are uploaded to the dev label
+          # e.g., `main` branch commits
+          envs = {"ANACONDA_ORG_LABEL": "dev"}
+
+          if "${{ github.ref_name }}".startswith("feature/"):
+              # feature branch commits are uploaded to a custom label
+              envs["ANACONDA_ORG_LABEL"] = "${{ github.ref_name }}"
+          elif re.match(r"\d+(\.\d+)+\.x", "${{ github.ref_name }}"):
+              # release branch commits are added to the rc label
+              # see https://github.com/conda/infrastructure/issues/760
+              _, name = "${{ github.repository }}".split("/")
+              envs["ANACONDA_ORG_LABEL"] = f"rc-{name}-${{ github.ref_name }}"
+
+              # if no releases have occurred on this branch yet then `git describe --tag`
+              # will misleadingly produce a version number relative to the last release
+              # and not relative to the current release branch, if this is the case we need
+              # to override the version with a derivative of the branch name
+
+              # override the version if `git describe --tag` does not start with the branch version
+              last_release = check_output(["git", "describe", "--tag"])
+              prefix = "${{ github.ref_name }}"[:-1]  # without x suffix
+              if not last_release.startswith(prefix):
+                  envs["VERSION_OVERRIDE"] = "${{ github.ref_name }}"
+
+          Path(environ["GITHUB_ENV"]).write_text("\n".join(f"{name}={value}" for name, value in envs.items()))
+
+      - name: Create & Upload
+        uses: conda/actions/canary-release@6e72e0db87e72f0020e493aeb02f864363bd9258 # v24.11.1
         with:
-          python-version: ${{ matrix.python-version }}
-          channels: defaults
-          run-post: false  # skip post cleanup
-          # conda not preinstalled in arm64 runners
-          miniconda-version: ${{ runner.arch == 'ARM64' && 'latest' || null }}
-          architecture: ${{ runner.arch }}
-
-      - name: Build package
-        # make sure we don't run on forks
-        if: github.repository_owner == 'anaconda'
-        id: build
-        shell: bash -l {0}
-        env:
-          # Run conda-build in isolated activation to properly package the software
-          _CONDA_BUILD_ISOLATED_ACTIVATION: 1
-        run: |
-          set -euo pipefail
-          conda activate test
-          conda install --yes --quiet conda-build anaconda-client
-          # git needs to be installed after conda-build
-          # see https://github.com/conda/conda/issues/11758
-          # see https://github.com/conda/actions/pull/47
-          conda install --yes --quiet git
-          conda info
-          conda config --show-sources
-          conda list
-          conda build --croot=${{ runner.temp }}/pkgs --override-channels  -c conda-canary/label/dev -c defaults recipe
-
-      - name: Set variables
-        id: set-vars
-        run: |
-          echo "PACKAGE_LABEL=${{ github.ref_name == 'main' && 'dev' || format('{0}-{1}', github.event.repository.name, github.ref_name) }}" >> $GITHUB_ENV
-          echo "PACKAGE_NAME=${{ github.event.repository.name }}" >> $GITHUB_ENV
-
-      - name: Upload package
-        # make sure we don't run in branches
-        if: github.ref_name == 'main'
-        id: upload
-        shell: bash -l {0}
-        run: |
-          echo "::group::Uploading package"
-          anaconda \
-            --token="${{ secrets.ANACONDA_ORG_TOKEN }}" \
-            upload \
-            --force \
-            --register \
-            --no-progress \
-            --user="distribution-plugins" \
-            --label="$PACKAGE_LABEL" \
-            ${{ runner.temp }}/pkgs/${{ matrix.subdir }}/$PACKAGE_NAME-*.tar.bz2
-          echo "Uploaded the following files:"
-          basename -a ./pkgs/${{ matrix.subdir }}/$PACKAGE_NAME-*.tar.bz2
-          echo "::endgroup::"
-
-          echo "Use this command to try out the build:"
-          echo "conda install -c distribution-plugins/label/$PACKAGE_LABEL $PACKAGE_NAME"
+          package-name: ${{ github.event.repository.name }}
+          subdir: ${{ matrix.subdir }}
+          anaconda-org-channel: distribution-plugins
+          anaconda-org-label: ${{ env.ANACONDA_ORG_LABEL }}
+          anaconda-org-token: ${{ secrets.ANACONDA_ORG_TOKEN }}
+          conda-build-argumetns: --channel conda-canary/label/dev
