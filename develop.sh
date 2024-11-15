@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Used to switch CONDA_EXE to the one located in development environment
 # To use this script, run `source develop.sh`
 
@@ -8,8 +10,8 @@ fi
 
 CONDA_ENV_DIR="./env"
 
-conda create -p "$CONDA_ENV_DIR" --file tests/requirements.txt --file tests/requirements-ci.txt --yes
+conda create -p "$CONDA_ENV_DIR" --channel conda-canary/label/dev --file tests/requirements.txt --file tests/requirements-ci.txt --yes
 conda activate "$CONDA_ENV_DIR"
-pip install --no-deps --no-index --no-build-isolation -e .
+pip install -e .
 
 CONDA_EXE="$CONDA_PREFIX/condabin/conda"

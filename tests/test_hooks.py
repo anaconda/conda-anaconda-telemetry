@@ -1,43 +1,56 @@
+# Copyright (C) 2024 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 
 from conda_anaconda_telemetry.hooks import (
-    conda_session_headers,
-    conda_settings,
-    HEADER_INSTALL,
     HEADER_CHANNELS,
-    HEADER_SYS_INFO,
-    HEADER_VIRTUAL_PACKAGES,
+    HEADER_INSTALL,
     HEADER_PACKAGES,
     HEADER_SEARCH,
+    HEADER_SYS_INFO,
+    HEADER_VIRTUAL_PACKAGES,
+    SIZE_LIMIT,
+    _conda_request_headers,
+    conda_session_headers,
+    conda_settings,
     timer,
 )
+
+if TYPE_CHECKING:
+    from pytest import CaptureFixture, MonkeyPatch
+    from pytest_mock import MockerFixture
+
 
 #: Host used across all tests
 TEST_HOST = "repo.anaconda.com"
 
+TEST_PACKAGES = [
+    "defaults/osx-arm64::sqlite-3.45.3-h80987f9_0",
+    "defaults/osx-arm64::pcre2-10.42-hb066dcc_1",
+    "defaults/osx-arm64::libxml2-2.13.1-h0b34f26_2",
+]
+
+
+def mock_list_packages(*args: tuple, **kwargs: dict) -> tuple:  # noqa: ARG001
+    return 0, TEST_PACKAGES
+
 
 @pytest.fixture(autouse=True)
-def packages(mocker):
+def packages(mocker: MockerFixture) -> list:
     """
     Mocks ``conda_anaconda_telemetry.hooks.list_packages``
     """
-    packages = [
-        "defaults/osx-arm64::sqlite-3.45.3-h80987f9_0",
-        "defaults/osx-arm64::pcre2-10.42-hb066dcc_1",
-        "defaults/osx-arm64::libxml2-2.13.1-h0b34f26_2",
-    ]
-
-    def mock_list_packages(*args, **kwargs):
-        return 0, packages
-
     mocker.patch("conda_anaconda_telemetry.hooks.list_packages", mock_list_packages)
+    return TEST_PACKAGES
 
-    return packages
 
-
-def test_conda_request_header_default_headers(mocker):
+def test_conda_request_header_default_headers(mocker: MockerFixture) -> None:
     """
     Ensure default headers are returned
     """
@@ -62,7 +75,9 @@ def test_conda_request_header_default_headers(mocker):
     )
 
 
-def test_conda_request_header_with_search(monkeypatch, mocker):
+def test_conda_request_header_with_search(
+    monkeypatch: MonkeyPatch, mocker: MockerFixture
+) -> None:
     """
     Ensure default headers are returned when conda search is invoked
     """
@@ -86,7 +101,9 @@ def test_conda_request_header_with_search(monkeypatch, mocker):
     )
 
 
-def test_conda_request_header_with_install(monkeypatch, mocker):
+def test_conda_request_header_with_install(
+    monkeypatch: MonkeyPatch, mocker: MockerFixture
+) -> None:
     """
     Ensure default headers are returned when conda search is invoked
     """
@@ -110,7 +127,7 @@ def test_conda_request_header_with_install(monkeypatch, mocker):
     )
 
 
-def test_conda_request_header_when_disabled(monkeypatch, mocker):
+def test_conda_request_header_when_disabled(mocker: MockerFixture) -> None:
     """
     Make sure that nothing is returned when the plugin is disabled via settings
     """
@@ -120,14 +137,14 @@ def test_conda_request_header_when_disabled(monkeypatch, mocker):
     assert not tuple(conda_session_headers(TEST_HOST))
 
 
-def test_timer_in_info_mode(caplog):
+def test_timer_in_info_mode(caplog: CaptureFixture) -> None:
     """
     Ensure the timer decorator works and logs the time taken in INFO mode
     """
     caplog.set_level(logging.INFO)
 
     @timer
-    def test():
+    def test() -> int:
         return 1
 
     assert test() == 1
@@ -138,7 +155,7 @@ def test_timer_in_info_mode(caplog):
     assert "function: test; duration (seconds):" in caplog.text
 
 
-def test_conda_settings():
+def test_conda_settings() -> None:
     """
     Ensure the correct conda settings are returned
     """
@@ -150,7 +167,9 @@ def test_conda_settings():
     assert settings[0].parameter.default.value is True
 
 
-def test_conda_session_headers_with_exception(mocker, caplog):
+def test_conda_session_headers_with_exception(
+    mocker: MockerFixture, caplog: CaptureFixture
+) -> None:
     """
     When any exception is encountered, ``conda_session_headers`` should return nothing
     and log a debug message.
@@ -167,9 +186,40 @@ def test_conda_session_headers_with_exception(mocker, caplog):
     assert "Exception: Boom" in caplog.text
 
 
-def test_conda_session_headers_with_non_matching_url(mocker, caplog):
+def test_conda_session_headers_with_non_matching_url() -> None:
     """
     When any exception is encountered, ``conda_session_headers`` should return nothing
     and log a debug message.
     """
     assert list(conda_session_headers("https://example.com")) == []
+
+
+@pytest.mark.parametrize(
+    "command,argparse_mock",
+    (
+        (
+            ["conda", "install", "package"],
+            MagicMock(packages=["package"], cmd="install"),
+        ),
+        (
+            ["conda", "search", "package"],
+            MagicMock(match_spec=["package"], cmd="search"),
+        ),
+        (["conda", "update", "package"], MagicMock(packages=["package"], cmd="update")),
+    ),
+)
+def test_header_wrapper_size_limit_constraint(
+    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
+    command: list[str],
+    argparse_mock: MagicMock,
+) -> None:
+    """
+    Ensures that the size limit is being adhered to when all ``HeaderWrapper``
+    objects are combined
+    """
+    monkeypatch.setattr("sys.argv", command)
+    mocker.patch("conda_anaconda_telemetry.hooks.context._argparse_args", argparse_mock)
+
+    headers = _conda_request_headers()
+    assert sum(header.size_limit for header in headers) <= SIZE_LIMIT
