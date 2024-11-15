@@ -12,7 +12,8 @@ repos:
       - id: check-yaml
         exclude: |
           (?x)^(
-            recipe/meta.yaml
+            recipe/meta.yaml |
+            docker-compose.yaml
           )
       - id: check-json
       # catch git merge/rebase problems
