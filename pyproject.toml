@@ -29,8 +29,22 @@ dynamic = [
 [project.entry-points.conda]
 conda-anaconda-telemetry = "conda_anaconda_telemetry.hooks"
 
-[tool.setuptools.packages]
-find = {}
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",  # ignore type checking imports
+]
+omit = [
+  "tests/*",
+]
+show_missing = true
+skip_covered = true
+sort = "Miss"
+
+[tool.coverage.run]
+# store relative paths in coverage information
+relative_files = true
+
 [tool.hatch.build.hooks.vcs]
 version-file = "anaconda_conda_telemetry/_version.py"
 
@@ -40,3 +54,54 @@ source = "vcs"
 [tool.hatch.version.raw-options]
 local_scheme = "dirty-tag"
 
+[tool.pytest.ini_options]
+addopts = [
+  "--color=yes",
+  # "--cov=anaconda_conda_telemetry",  # passed in test runner scripts instead (avoid debugger)
+  "--cov-report=term",  # print summary table to screen
+  "--cov-report=xml",  # for codecov/codecov-action upload
+  "--tb=native",
+  "-vv",
+]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py39"
+
+[tool.ruff.lint]
+extend-per-file-ignores = {"tests/*" = ["D", "S101"]}
+ignore = ["D203", "D213"]
+# see https://docs.astral.sh/ruff/rules/
+select = [
+  "A",  # flake8-builtins
+  "ANN",  # flake8-annotations
+  "ARG",  # flake8-unused-arguments
+  "B",  # flake8-bugbear
+  "C",  # flake8-commas
+  "C4",  # flake8-comprehensions
+  "C90",  # mccabe
+  "D",  # pydocstyle
+  "DTZ",  # flake8-datetimez
+  "E",  # pycodestyle errors
+  "ERA",  # eradicate
+  "F",  # pyflakes
+  "FA",  # flake8-future-annotations
+  "G",  # flake8-logging-format
+  "I",  # isort
+  "ISC",  # flake8-implicit-str-concat
+  "LOG",  # flake8-logging
+  "N",  # pep8-naming
+  "PIE",  # flake8-pie
+  "PTH",  # flake8-use-pathlib
+  "RUF",  # Ruff-specific rules
+  "S",  # flake8-bandit
+  "SIM",  # flake8-simplify
+  "T10",  # flake8-debugger
+  "TCH",  # flake8-type-checking
+  "UP",  # pyupgrade
+  "W",  # pycodestyle warnings
+  "YTT",  # flake8-2020
+]
+
+[tool.setuptools]
+packages = ["anaconda_conda_telemetry"]
