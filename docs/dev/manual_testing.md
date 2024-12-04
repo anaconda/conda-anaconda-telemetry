@@ -10,10 +10,10 @@ the request headers.
 
 Make sure to begin with a new Miniconda install, and follow these steps:
 
-Install the latest development version of conda:
+Install the conda 24.11.0 or later:
 
 ```commandline
-conda install conda-canary/label/dev::conda
+conda install "conda>=24.11"
 ```
 
 Clone this repository locally:
