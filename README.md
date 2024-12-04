@@ -1,32 +1,29 @@
-# conda-anaconda-telemetry
+# Conda Anaconda Telemetry
 
-Anaconda Telemetry for conda
+Welcome to the Conda Anaconda Telemetry project! This project is a plugin that
+submits data about conda's usage to Anaconda. This helps Anaconda learn more about
+those using conda. This plugin is also an example of how others can leverage conda's
+plugin system to begin collecting more information about their conda users too.
 
-## Development
+## Installation
 
-To begin developing for this project, source the `develop.sh` script (macOS and Linux only).
-Run the following command from the root of your project directory.
+To begin using this plugin, install it in your base environment with the following command:
 
-```bash
-source develop.sh
+```commandline
+conda install --name base conda-anaconda-telemetry
 ```
 
-This will create a new environment in the `./env` folder of your project and modifies
-`CONDA_EXE` to point to an isolated version of conda within this environment.
+## Disabling
 
-To update this environment when new dependencies are added to `requirements.txt`, you
-can run the same `source develop.sh` command as above.
+To disable this plugin, you can either add the following to your `.condarc` file:
 
-### Setting up OTEL collector and Elastic Search
-
-This project comes with a `docker-compose.yaml` file which can be used to start
-a locally running instance of ElasticSearch and an OTEL collector container that
-will submit data to ElasticSearch. To initialize this, you first need to copy
-the `env-template` file to the location `.env` with the following command:
-
-```bash
-cp env-template .env
+```yaml
+plugins:
+  anaconda_telemetry: false
 ```
 
-This `.env` file contains  sensitive information such as passwords and encryption keys.
-Please update these environment variables as needed.
+Or remove it from your base environment:
+
+```commandline
+conda remove --name base conda-anaconda-telemetry
+```
