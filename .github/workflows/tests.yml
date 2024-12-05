@@ -185,7 +185,7 @@ jobs:
           channels: defaults
 
       - name: Install Dependencies
-        run: conda env update --file docs/environment.yml
+        run: conda env update --name base --file docs/environment.yml
 
       - name: Build Docs
         run: make -C docs html
