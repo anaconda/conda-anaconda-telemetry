@@ -60,6 +60,7 @@ jobs:
             code:
               - 'conda_anaconda_telemetry/**'
               - 'tests/**'
+              - 'docs/**'
               - '*.py'
               - 'conda.recipe/**'
               - '.github/workflows/tests.yml'
@@ -161,6 +162,33 @@ jobs:
           --cov=conda_anaconda_telemetry
           --basetemp=${{ runner.temp }}
           -n auto
+
+
+  build_docs:
+    needs: changes
+    if: github.event_name == 'schedule' || needs.changes.outputs.code == 'true'
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.ref }}
+          clean: true
+          fetch-depth: 0
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@d2e6a045a86077fb6cad6f5adf368e9076ddaa8d # v3.1.0
+        with:
+          run-post: false  # skip post cleanup
+          miniconda-version: latest
+          channels: defaults
+
+      - name: Install Dependencies
+        run: conda env update --file docs/environment.yml
+
+      - name: Build Docs
+        run: make -C docs html
 
   # required check
   analyze:
