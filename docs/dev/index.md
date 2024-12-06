@@ -29,7 +29,7 @@ This script performs the following:
 - Installs an editable version of the plugin
 - Modifies `CONDA_EXE` to point at the locally installed conda
 
-After it finishes running, you will have a development environment setup which you
+After it finishes running, you will have a development environment setup that you
 can start using.
 
 ## Technical design
@@ -39,12 +39,12 @@ to HTTP request headers submitted to Anaconda channel servers. This is done by r
 on the [conda plugin for request headers][conda-plugins-request-headers].
 
 The entire plugin consists of just a single `hooks.py` module and currently submits up to
-five headers per request. To respect size limits (typically 8KB) each header has been given
-a character limit with `Anaconda-Telemetry-Packages` getting the highest limit because of its
-inherit larger size than the rest. When a header data is larger than its limit the data is
+five headers per request. To respect size limits (typically 8KB), each header has been given
+a character limit, with `Anaconda-Telemetry-Packages` getting the highest limit because it is
+inherently larger than the other headers. When a header's data is larger than its limit, the data is
 truncated and submitted as partial data.
 
-Below is a table showing the current headers along with their size limits
+Below is a table showing the current headers, along with their size limits:
 
 | Header                                | Size (in bytes) |
 |---------------------------------------|-----------------|
