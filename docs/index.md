@@ -10,7 +10,7 @@ about their conda users too.
 
 To begin using this plugin, install it in your base environment with the following command:
 
-```commandline
+```
 conda install --name base conda-anaconda-telemetry
 ```
 
@@ -25,7 +25,7 @@ plugins:
 
 Or remove it from your base environment:
 
-```commandline
+```
 conda remove --name base conda-anaconda-telemetry
 ```
 

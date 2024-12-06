@@ -5,7 +5,7 @@ environment and a discussion on how the plugin itself functions.
 
 ## Development environment
 
-```{admonition}
+```{note}
 The development environment setup is currently only available for users
 of unix-like operating systems (e.g. macOS or Linux)
 ```

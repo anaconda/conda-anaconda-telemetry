@@ -12,7 +12,7 @@ Make sure to begin with a new Miniconda install, and follow these steps:
 
 Install the conda 24.11.0 or later:
 
-```commandline
+```
 conda install "conda>=24.11"
 ```
 
@@ -24,7 +24,7 @@ git clone git@github.com:anaconda/conda-anaconda-telemetry.git
 
 Use pip to install the plugin:
 
-```commandline
+```
 pip install -e conda-anaconda-telemetry
 ```
 

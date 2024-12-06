@@ -23,6 +23,7 @@ extensions = [
     "sphinxcontrib.images",
     "sphinx_copybutton",
     "sphinx_reredirects",
+    "sphinx_sitemap",
     "notfound.extension",
 ]
 
