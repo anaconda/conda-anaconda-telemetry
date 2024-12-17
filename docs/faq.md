@@ -2,10 +2,10 @@
 
 ## What happens when I enable conda-anaconda-telemetry?
 
-When the `conda-anaconda-telemetry` plugin is installed and enabled, the plugin will collect additional
-information about how conda is being used. This is then submitted to the channel servers that
-are currently configured via HTTP request headers. This allows channel owners to gain additional
-insights about how their channels are being used.
+When the `conda-anaconda-telemetry` plugin is installed in the conda base environment and enabled,
+the plugin will collect additional information about how conda is being used. This is then submitted
+to the channel servers that are currently configured via HTTP request headers.
+This allows channel owners to gain additional insights about how their channels are being used.
 
 ## What data is tracked by this plugin?
 
