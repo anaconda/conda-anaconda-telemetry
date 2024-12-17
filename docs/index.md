@@ -33,5 +33,6 @@ conda remove --name base conda-anaconda-telemetry
 ```{toctree}
 :hidden:
 
+faq
 dev/index
 ```
