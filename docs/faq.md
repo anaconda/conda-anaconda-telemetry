@@ -12,7 +12,7 @@ insights about how their channels are being used.
 We currently collect the following information when this plugin is installed:
 
 - Installed [virtual packages](https://docs.conda.io/projects/conda/en/stable/dev-guide/plugins/virtual_packages.html)
-  (e.g. `glibc` version or your current architecture specifications e.g. `m1`)
+  (e.g., `glibc` version or your current architecture specifications, such as `m1`)
 - Installed packages in the active environment (e.g. the output of `conda list`)
 - Configured channels (e.g. `defaults` or `conda-forge`)
 - System information (e.g. `conda-build` version or the command currently being run)
@@ -23,7 +23,7 @@ We currently collect the following information when this plugin is installed:
 
 ## Which commands are you tracking?
 
-We only track commands which make network requests. This includes the following:
+We only track commands that make network requests. This includes the following:
 
 - `conda search`
 - `conda install`
