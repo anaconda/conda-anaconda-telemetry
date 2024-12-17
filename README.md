@@ -27,3 +27,15 @@ Or remove it from your base environment:
 ```commandline
 conda remove --name base conda-anaconda-telemetry
 ```
+
+## Contributing to this repository
+
+Contributions are very welcome 😄
+
+Feel free to:
+1. File bug reports
+2. Create feature requests
+3. Open pull requests to resolve issues available in the [Github issues queue](https://github.com/anaconda/conda-anaconda-telemetry/issues).
+4. Review open pull requests
+5. Report any typos, wrong/outdated information on the [documentation website](https://anaconda.github.io/conda-anaconda-telemetry/).
+6. Engage in ongoing discussions in this project and add new ideas.
