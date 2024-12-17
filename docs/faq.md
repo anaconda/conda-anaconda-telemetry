@@ -18,7 +18,7 @@ We currently collect the following information when this plugin is installed:
 - System information (e.g. `conda-build` version or the command currently being run)
 - When `conda search` is run, we track the packages that are being searched for
 - When `conda install` or `conda create` is run, we track the packages that are being installed that are
-  specified at the command line (e.g. for the command`conda install package-a package-b`, `package-a` and
+  specified at the command line (e.g. for the command `conda install package-a package-b`, `package-a` and
   `package-b` will be tracked)
 
 ## Which commands are you tracking?
