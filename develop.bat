@@ -1,6 +1,6 @@
 @echo off
 
-SET "CONDA_ENV_DIR=%CD%\env"
+@SET "CONDA_ENV_DIR=%CD%\env"
 @SET "_CONDABAT=%CONDA_ENV_DIR%\condabin\conda.bat"
 
 @CALL conda "create" "-p" "%CONDA_ENV_DIR%" "--file" "tests\requirements.txt" "--file" "tests\requirements-ci.txt" "--yes"
