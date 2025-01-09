@@ -241,12 +241,11 @@ def _conda_request_headers() -> Sequence[HeaderWrapper]:
 @hookimpl
 def conda_session_headers(host: str) -> Iterator[CondaRequestHeader]:
     """Return a list of custom headers to be included in the request."""
-    if context.plugins.anaconda_telemetry:
-        try:
-            if host in REQUEST_HEADER_HOSTS:
-                yield from validate_headers(_conda_request_headers())
-        except Exception as exc:
-            logger.debug("Failed to collect telemetry data", exc_info=exc)
+    try:
+        if context.plugins.anaconda_telemetry and host in REQUEST_HEADER_HOSTS:
+            yield from validate_headers(_conda_request_headers())
+    except Exception as exc:
+        logger.debug("Failed to collect telemetry data", exc_info=exc)
 
 
 @hookimpl
