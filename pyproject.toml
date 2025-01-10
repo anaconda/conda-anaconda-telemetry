@@ -67,6 +67,9 @@ addopts = [
   "-vv",
 ]
 testpaths = ["tests"]
+env = [
+    "CONDA_CHANNELS=defaults",
+]
 
 [tool.ruff]
 target-version = "py39"
