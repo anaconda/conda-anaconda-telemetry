@@ -57,7 +57,7 @@ def get_install_arguments() -> tuple[str, ...]:
     return context._argparse_args.packages
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class SysInfo:
     """Holds specific system information about a conda installation/environment."""
 
