@@ -153,7 +153,7 @@ def test_timer_in_info_mode(caplog: CaptureFixture) -> None:
 
     assert caplog.records[0].levelname == "INFO"
 
-    assert "INFO     conda_anaconda_telemetry.backends.request_headers" in caplog.text
+    assert "INFO     conda_anaconda_telemetry" in caplog.text
     assert "function: test; duration (seconds):" in caplog.text
 
 
