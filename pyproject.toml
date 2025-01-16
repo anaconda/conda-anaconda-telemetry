@@ -66,17 +66,17 @@ addopts = [
   "--tb=native",
   "-vv",
 ]
-testpaths = ["tests"]
 env = [
-    "CONDA_CHANNELS=defaults",
+  "CONDA_CHANNELS=defaults",
 ]
+testpaths = ["tests"]
 
 [tool.ruff]
 target-version = "py39"
 
 [tool.ruff.lint]
 extend-per-file-ignores = {"tests/*" = ["D", "S101"]}
-ignore = ["D203", "D213", "ISC001"]
+ignore = ["D203", "D205", "D213", "ISC001", "D401"]
 # see https://docs.astral.sh/ruff/rules/
 select = [
   "A",  # flake8-builtins

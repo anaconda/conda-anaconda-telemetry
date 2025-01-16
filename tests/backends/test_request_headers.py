@@ -19,10 +19,9 @@ from conda_anaconda_telemetry.backends.request_headers import (
     get_conda_request_headers,
     timer,
 )
-
 from conda_anaconda_telemetry.hooks import (
-    conda_settings,
     conda_session_headers,
+    conda_settings,
 )
 
 if TYPE_CHECKING:
@@ -49,7 +48,7 @@ def packages(mocker: MockerFixture) -> list:
     """
     Mocks ``conda_anaconda_telemetry.hooks.list_packages``
     """
-    mocker.patch("conda_anaconda_telemetry.backends.request_headers.list_packages", mock_list_packages)
+    mocker.patch("conda_anaconda_telemetry.metrics.list_packages", mock_list_packages)
     return TEST_PACKAGES
 
 
@@ -59,7 +58,7 @@ def testget_conda_request_header_default_headers(mocker: MockerFixture) -> None:
     """
     mock_argparse_args = mocker.MagicMock(match_spec="package", cmd="search")
     mocker.patch(
-        "conda_anaconda_telemetry.backends.request_headers.context._argparse_args", mock_argparse_args
+        "conda_anaconda_telemetry.metrics.context._argparse_args", mock_argparse_args
     )
     headers = {
         header.name: header for header in tuple(conda_session_headers(TEST_HOST))
@@ -79,7 +78,7 @@ def testget_conda_request_header_default_headers(mocker: MockerFixture) -> None:
 
 
 def testget_conda_request_header_with_search(
-        monkeypatch: MonkeyPatch, mocker: MockerFixture
+    monkeypatch: MonkeyPatch, mocker: MockerFixture
 ) -> None:
     """
     Ensure default headers are returned when conda search is invoked
@@ -87,7 +86,7 @@ def testget_conda_request_header_with_search(
     monkeypatch.setattr("sys.argv", ["conda", "search", "package"])
     mock_argparse_args = mocker.MagicMock(match_spec="package", cmd="search")
     mocker.patch(
-        "conda_anaconda_telemetry.backends.request_headers.context._argparse_args", mock_argparse_args
+        "conda_anaconda_telemetry.metrics.context._argparse_args", mock_argparse_args
     )
 
     header_names = {header.name for header in tuple(conda_session_headers(TEST_HOST))}
@@ -105,7 +104,7 @@ def testget_conda_request_header_with_search(
 
 
 def testget_conda_request_header_with_install(
-        monkeypatch: MonkeyPatch, mocker: MockerFixture
+    monkeypatch: MonkeyPatch, mocker: MockerFixture
 ) -> None:
     """
     Ensure default headers are returned when conda search is invoked
@@ -113,7 +112,7 @@ def testget_conda_request_header_with_install(
     monkeypatch.setattr("sys.argv", ["conda", "install", "package"])
     mock_argparse_args = mocker.MagicMock(packages=["package"], cmd="install")
     mocker.patch(
-        "conda_anaconda_telemetry.backends.request_headers.context._argparse_args", mock_argparse_args
+        "conda_anaconda_telemetry.metrics.context._argparse_args", mock_argparse_args
     )
 
     header_names = {header.name for header in tuple(conda_session_headers(TEST_HOST))}
@@ -135,7 +134,7 @@ def testget_conda_request_header_when_disabled(mocker: MockerFixture) -> None:
     Make sure that nothing is returned when the plugin is disabled via settings
     """
     mocker.patch(
-        "conda_anaconda_telemetry.backends.request_headers.context.plugins.anaconda_telemetry", False
+        "conda_anaconda_telemetry.metrics.context.plugins.anaconda_telemetry", False
     )
     assert not tuple(conda_session_headers(TEST_HOST))
 
@@ -171,7 +170,7 @@ def test_conda_settings() -> None:
 
 
 def test_conda_session_headers_with_exception(
-        mocker: MockerFixture, caplog: CaptureFixture
+    mocker: MockerFixture, caplog: CaptureFixture
 ) -> None:
     """
     When any exception is encountered, ``conda_session_headers`` should return nothing
@@ -200,29 +199,31 @@ def test_conda_session_headers_with_non_matching_url() -> None:
 @pytest.mark.parametrize(
     "command,argparse_mock",
     (
-            (
-                    ["conda", "install", "package"],
-                    MagicMock(packages=["package"], cmd="install"),
-            ),
-            (
-                    ["conda", "search", "package"],
-                    MagicMock(match_spec=["package"], cmd="search"),
-            ),
-            (["conda", "update", "package"], MagicMock(packages=["package"], cmd="update")),
+        (
+            ["conda", "install", "package"],
+            MagicMock(packages=["package"], cmd="install"),
+        ),
+        (
+            ["conda", "search", "package"],
+            MagicMock(match_spec=["package"], cmd="search"),
+        ),
+        (["conda", "update", "package"], MagicMock(packages=["package"], cmd="update")),
     ),
 )
 def test_header_wrapper_size_limit_constraint(
-        monkeypatch: MonkeyPatch,
-        mocker: MockerFixture,
-        command: list[str],
-        argparse_mock: MagicMock,
+    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
+    command: list[str],
+    argparse_mock: MagicMock,
 ) -> None:
     """
     Ensures that the size limit is being adhered to when all ``HeaderWrapper``
     objects are combined
     """
     monkeypatch.setattr("sys.argv", command)
-    mocker.patch("conda_anaconda_telemetry.backends.request_headers.context._argparse_args", argparse_mock)
+    mocker.patch(
+        "conda_anaconda_telemetry.metrics.context._argparse_args", argparse_mock
+    )
 
     headers = get_conda_request_headers()
     assert sum(header.size_limit for header in headers) <= SIZE_LIMIT
