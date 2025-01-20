@@ -5,12 +5,22 @@ data collectors.
 """
 
 from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (
+    OTLPMetricExporter,
+)
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.metrics import (
+    get_meter_provider,
+    set_meter_provider,
+)
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
 )
 
+from .. import APP_NAME
 from ..metrics import (
     get_channel_urls,
     get_install_arguments,
@@ -20,6 +30,12 @@ from ..metrics import (
     get_virtual_packages,
 )
 from ..utils import timer
+
+_metric_exporter = OTLPMetricExporter(endpoint="http://localhost:4317/", insecure=True)
+_metric_reader = PeriodicExportingMetricReader(_metric_exporter)
+_metric_provider = MeterProvider(metric_readers=[_metric_reader])
+set_meter_provider(_metric_provider)
+_meter = get_meter_provider().get_meter(f"{APP_NAME}-metrics")
 
 _provider = TracerProvider()
 _exporter = OTLPSpanExporter(
@@ -32,12 +48,10 @@ _provider.add_span_processor(_processor)
 trace.set_tracer_provider(_provider)
 
 # Creates a tracer from the global tracer provider
-_tracer = trace.get_tracer("conda-anaconda-telemetry")
+_tracer = trace.get_tracer(APP_NAME)
 
 
-@timer
-def submit_telemetry_data(command: str) -> None:
-    """Submits telemetry data to the configured data collector."""
+def _submit_telemetry_with_trace(command: str) -> None:
     with _tracer.start_as_current_span("post_command_hook") as current_span:
         sys_info = get_sys_info(extra=True)
 
@@ -71,3 +85,14 @@ def submit_telemetry_data(command: str) -> None:
         # Install Arguments
         if command in {"create", "install", "update"}:
             current_span.set_attribute("install_arguments", get_install_arguments())
+
+
+def _submit_telemetry_with_metrics(command: str) -> None:
+    _meter.create_counter(f"conda.command.{command}", "Count").add(1)
+
+
+@timer
+def submit_telemetry_data(command: str) -> None:
+    """Submits telemetry data to the configured data collector."""
+    _submit_telemetry_with_trace(command)
+    _submit_telemetry_with_metrics(command)

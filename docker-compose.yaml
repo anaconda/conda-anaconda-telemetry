@@ -34,6 +34,15 @@ services:
       timeout: 5s
       retries: 10
 
+  prometheus:
+    image: prom/prometheus:latest
+    hostname: prometheus
+    restart: always
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+
   otel_collector:
     image: otel/opentelemetry-collector-contrib:latest@sha256:631637f7b33668eda594011d5f173100a3fe245da7fa8dae0885b368da4d0a6e
     container_name: ${OTEL_LOCAL_CONTAINER_NAME}

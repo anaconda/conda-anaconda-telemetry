@@ -10,6 +10,8 @@ exporters:
     traces_index: conda-anaconda-telemetry
     auth:
       authenticator: basicauth
+  prometheus:
+    endpoint: "otel_collector:8889"
 
 extensions:
   health_check:
@@ -33,4 +35,8 @@ service:
     logs:
       receivers: [otlp]
       exporters: [elasticsearch]
+      processors: [batch]
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheus]
       processors: [batch]
