@@ -1,17 +1,27 @@
 services:
+  grafana:
+    # Default username and password for Grafana are admin/admin
+    image: grafana/grafana-enterprise
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:${ES_LOCAL_VERSION}
     container_name: ${ES_LOCAL_CONTAINER_NAME}
     volumes:
-      - dev-elasticsearch:/usr/share/elasticsearch/data
+      - elasticsearch-data:/usr/share/elasticsearch/data
     ports:
       - 127.0.0.1:${ES_LOCAL_PORT}:9200
     environment:
       - discovery.type=single-node
       - ELASTIC_PASSWORD=${ES_LOCAL_PASSWORD}
-      - xpack.security.enabled=true
+      - xpack.security.enabled=false
       - xpack.security.http.ssl.enabled=false
-      - xpack.license.self_generated.type=trial
+      - xpack.license.self_generated.type=basic
       - xpack.ml.use_auto_machine_memory_percent=true
       - ES_JAVA_OPTS=-Xms${ES_LOCAL_HEAP_INIT} -Xmx${ES_LOCAL_HEAP_MAX}
     ulimits:
@@ -23,42 +33,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
-  kibana_settings:
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ES_LOCAL_VERSION}
-    container_name: ${KIBANA_SETTINGS_LOCAL_CONTAINER_NAME}
-    restart: no
-    command: >
-      bash -c '
-        echo "Setup the kibana_system password";
-        until curl -s -u "elastic:${ES_LOCAL_PASSWORD}" -X POST http://elasticsearch:${ES_LOCAL_PORT}/_security/user/kibana_system/_password -d "{\"password\":\"'${KIBANA_LOCAL_PASSWORD}'\"}" -H "Content-Type: application/json" | grep -q "^{}"; do sleep 5; done;
-      '
-
-  kibana:
-    depends_on:
-      kibana_settings:
-        condition: service_completed_successfully
-    image: docker.elastic.co/kibana/kibana:${ES_LOCAL_VERSION}
-    container_name: ${KIBANA_LOCAL_CONTAINER_NAME}
-    volumes:
-      - dev-kibana:/usr/share/kibana/data
-    ports:
-      - 127.0.0.1:${KIBANA_LOCAL_PORT}:5601
-    environment:
-      - SERVER_NAME=kibana
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - ELASTICSEARCH_USERNAME=kibana_system
-      - ELASTICSEARCH_PASSWORD=${KIBANA_LOCAL_PASSWORD}
-      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${KIBANA_ENCRYPTION_KEY}
-      - ELASTICSEARCH_PUBLICBASEURL=http://localhost:${ES_LOCAL_PORT}
-    healthcheck:
-      test: [CMD-SHELL, curl -s -I http://kibana:5601 | grep -q 'HTTP/1.1 302 Found']
-      interval: 10s
-      timeout: 10s
-      retries: 20
 
   otel_collector:
     image: otel/opentelemetry-collector-contrib:latest@sha256:631637f7b33668eda594011d5f173100a3fe245da7fa8dae0885b368da4d0a6e
@@ -73,5 +47,5 @@ services:
     command: --config /etc/otel/config.yaml
 
 volumes:
-  dev-elasticsearch:
-  dev-kibana:
+  elasticsearch-data:
+  grafana-data:

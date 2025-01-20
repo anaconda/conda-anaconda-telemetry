@@ -52,7 +52,7 @@ def packages(mocker: MockerFixture) -> list:
     return TEST_PACKAGES
 
 
-def testget_conda_request_header_default_headers(mocker: MockerFixture) -> None:
+def test_get_conda_request_header_default_headers(mocker: MockerFixture) -> None:
     """
     Ensure default headers are returned
     """
@@ -77,7 +77,7 @@ def testget_conda_request_header_default_headers(mocker: MockerFixture) -> None:
     )
 
 
-def testget_conda_request_header_with_search(
+def test_get_conda_request_header_with_search(
     monkeypatch: MonkeyPatch, mocker: MockerFixture
 ) -> None:
     """
@@ -103,7 +103,7 @@ def testget_conda_request_header_with_search(
     )
 
 
-def testget_conda_request_header_with_install(
+def test_get_conda_request_header_with_install(
     monkeypatch: MonkeyPatch, mocker: MockerFixture
 ) -> None:
     """
@@ -129,7 +129,7 @@ def testget_conda_request_header_with_install(
     )
 
 
-def testget_conda_request_header_when_disabled(mocker: MockerFixture) -> None:
+def test_get_conda_request_header_when_disabled(mocker: MockerFixture) -> None:
     """
     Make sure that nothing is returned when the plugin is disabled via settings
     """
@@ -190,8 +190,8 @@ def test_conda_session_headers_with_exception(
 
 def test_conda_session_headers_with_non_matching_url() -> None:
     """
-    When any exception is encountered, ``conda_session_headers`` should return nothing
-    and log a debug message.
+    When the host is not in the list of hosts that require telemetry data nothing should
+    be returned.
     """
     assert list(conda_session_headers("https://example.com")) == []
 

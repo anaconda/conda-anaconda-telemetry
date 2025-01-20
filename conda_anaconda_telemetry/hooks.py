@@ -47,5 +47,5 @@ def conda_post_commands() -> Iterator[CondaPostCommand]:
     yield CondaPostCommand(
         name="post-command-submit-telemetry-data",
         action=submit_telemetry_data,
-        run_for=["install", "remove", "update", "create"],
+        run_for=["install", "remove", "update", "create", "list", "search"],
     )
