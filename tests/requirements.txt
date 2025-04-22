@@ -1,2 +1,5 @@
 conda >=24.11
 python >=3.9
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp
