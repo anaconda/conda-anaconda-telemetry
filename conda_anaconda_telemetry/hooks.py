@@ -54,8 +54,11 @@ HEADER_INSTALL = f"{HEADER_PREFIX}-Install"
 #: Name of the sys info header
 HEADER_SYS_INFO = f"{HEADER_PREFIX}-Sys-Info"
 
-#: Hosts we want to submit request headers to
-REQUEST_HEADER_HOSTS = {"repo.anaconda.com", "conda.anaconda.org"}
+#: Hosts and paths we want to submit request headers to
+REQUEST_HEADER_PATTERNS = (
+    ("repo.anaconda.com", ""),
+    ("conda.anaconda.org", "/conda-forge/"),
+)
 
 
 def timer(func: Callable) -> Callable:
@@ -238,11 +241,21 @@ def _conda_request_headers() -> Sequence[HeaderWrapper]:
     return custom_headers
 
 
+def should_submit_request_headers(host: str, path: str) -> bool:
+    """Return a list of hosts and paths we want to submit request headers to."""
+    return any(
+        host == host_pattern and (not path_pattern or path.startswith(path_pattern))
+        for host_pattern, path_pattern in REQUEST_HEADER_PATTERNS
+    )
+
+
 @hookimpl
-def conda_session_headers(host: str) -> Iterator[CondaRequestHeader]:
+def conda_request_headers(host: str, path: str) -> Iterator[CondaRequestHeader]:
     """Return a list of custom headers to be included in the request."""
     try:
-        if context.plugins.anaconda_telemetry and host in REQUEST_HEADER_HOSTS:
+        if context.plugins.anaconda_telemetry and should_submit_request_headers(
+            host, path
+        ):
             yield from validate_headers(_conda_request_headers())
     except Exception as exc:
         logger.debug("Failed to collect telemetry data", exc_info=exc)
