@@ -241,7 +241,6 @@ def _conda_request_headers() -> Sequence[HeaderWrapper]:
     return custom_headers
 
 
-@functools.lru_cache(None)
 def should_submit_request_headers(host: str, path: str) -> bool:
     """Return a list of hosts and paths we want to submit request headers to."""
     return any(
