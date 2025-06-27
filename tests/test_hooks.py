@@ -55,12 +55,15 @@ def packages(mocker: MockerFixture) -> list:
     "host,path",
     [
         ("repo.anaconda.com", ""),  # Empty path should work for repo.anaconda.com
-        ("repo.anaconda.com", "/some/path"),  # Any path should work for repo.anaconda.com
+        (
+            "repo.anaconda.com",
+            "/some/path",
+        ),  # Any path should work for repo.anaconda.com
         ("conda.anaconda.org", "/conda-forge/"),  # Exact match for conda.anaconda.org
         ("conda.anaconda.org", "/conda-forge/noarch/pkg.conda"),  # Prefix match
     ],
 )
-def test_conda_request_header_default_headers(mocker: MockerFixture, host: str, path: str) -> None:
+def test_default_headers(mocker: MockerFixture, host: str, path: str) -> None:
     """
     Ensure default headers are returned for matching host/path combinations
     """
@@ -92,7 +95,7 @@ def test_conda_request_header_default_headers(mocker: MockerFixture, host: str, 
         ("conda.anaconda.org", "/conda-forge/"),
     ],
 )
-def test_conda_request_header_with_search(
+def test_search_headers(
     monkeypatch: MonkeyPatch, mocker: MockerFixture, host: str, path: str
 ) -> None:
     """
@@ -125,7 +128,7 @@ def test_conda_request_header_with_search(
         ("conda.anaconda.org", "/conda-forge/"),
     ],
 )
-def test_conda_request_header_with_install(
+def test_install_headers(
     monkeypatch: MonkeyPatch, mocker: MockerFixture, host: str, path: str
 ) -> None:
     """
@@ -151,7 +154,7 @@ def test_conda_request_header_with_install(
     )
 
 
-def test_conda_request_header_when_disabled(mocker: MockerFixture) -> None:
+def test_disabled_plugin(mocker: MockerFixture) -> None:
     """
     Make sure that nothing is returned when the plugin is disabled via settings
     """
@@ -191,11 +194,9 @@ def test_conda_settings() -> None:
     assert settings[0].parameter.default.value is True
 
 
-def test_conda_session_headers_with_exception(
-    mocker: MockerFixture, caplog: CaptureFixture
-) -> None:
+def test_exception_handling(mocker: MockerFixture, caplog: CaptureFixture) -> None:
     """
-    When any exception is encountered, ``conda_session_headers`` should return nothing
+    When any exception is encountered, ``conda_request_headers`` should return nothing
     and log a debug message.
     """
     caplog.set_level(logging.DEBUG)
@@ -276,26 +277,36 @@ def test_should_submit_request_headers(host: str, path: str, expected: bool) -> 
     assert should_submit_request_headers(host, path) == expected
 
 
-def test_should_submit_request_headers_with_request_header_urls() -> None:
+def test_patterns_validation() -> None:
     """
-    Test that should_submit_request_headers works with the actual REQUEST_HEADER_URLS values.
+    Test that should_submit_request_headers works with the actual
+    REQUEST_HEADER_PATTERNS values.
     """
-    from conda_anaconda_telemetry.hooks import REQUEST_HEADER_URLS
+    from conda_anaconda_telemetry.hooks import REQUEST_HEADER_PATTERNS
 
-    # Verify the expected REQUEST_HEADER_URLS structure
-    expected_urls = (
+    # Verify the expected REQUEST_HEADER_PATTERNS structure
+    expected_patterns = (
         ("repo.anaconda.com", ""),
         ("conda.anaconda.org", "/conda-forge/"),
     )
-    assert REQUEST_HEADER_URLS == expected_urls
+    assert expected_patterns == REQUEST_HEADER_PATTERNS
 
     # Test matching cases
     assert should_submit_request_headers("repo.anaconda.com", "/any/path") is True
-    assert should_submit_request_headers("conda.anaconda.org", "/conda-forge/linux-64/pkg.conda") is True
+    assert (
+        should_submit_request_headers(
+            "conda.anaconda.org", "/conda-forge/linux-64/pkg.conda"
+        )
+        is True
+    )
 
     # Test non-matching cases
-    assert should_submit_request_headers("conda.anaconda.org", "/other-channel") is False
-    assert should_submit_request_headers("conda.anaconda.org", "/conda-forge") is False  # Missing trailing slash
+    assert (
+        should_submit_request_headers("conda.anaconda.org", "/other-channel") is False
+    )
+    assert (
+        should_submit_request_headers("conda.anaconda.org", "/conda-forge") is False
+    )  # Missing trailing slash
     assert should_submit_request_headers("unknown.com", "/conda-forge/") is False
 
 
@@ -308,7 +319,7 @@ def test_should_submit_request_headers_with_request_header_urls() -> None:
         ("repo.anaconda.com.evil.com", "/conda-forge/"),  # Host spoofing attempt
     ],
 )
-def test_conda_request_header_non_matching_urls(mocker: MockerFixture, host: str, path: str) -> None:
+def test_non_matching_patterns(mocker: MockerFixture, host: str, path: str) -> None:
     """
     Ensure no headers are returned for non-matching host/path combinations
     """
@@ -316,6 +327,6 @@ def test_conda_request_header_non_matching_urls(mocker: MockerFixture, host: str
     mocker.patch(
         "conda_anaconda_telemetry.hooks.context._argparse_args", mock_argparse_args
     )
-    
+
     headers = list(conda_request_headers(host, path))
     assert headers == []
