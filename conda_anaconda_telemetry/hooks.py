@@ -251,7 +251,7 @@ def should_submit_request_headers(host: str, path: str) -> bool:
 
 
 @hookimpl
-def conda_request_headers(host: str, path: str = "") -> Iterator[CondaRequestHeader]:
+def conda_request_headers(host: str, path: str) -> Iterator[CondaRequestHeader]:
     """Return a list of custom headers to be included in the request."""
     try:
         if context.plugins.anaconda_telemetry and should_submit_request_headers(
