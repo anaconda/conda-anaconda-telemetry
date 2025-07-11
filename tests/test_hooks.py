@@ -285,8 +285,8 @@ def test_patterns_validation() -> None:
     from conda_anaconda_telemetry.hooks import REQUEST_HEADER_PATTERN
 
     # Verify the REQUEST_HEADER_PATTERN is a compiled regex
-    assert hasattr(REQUEST_HEADER_PATTERN, 'match')
-    assert hasattr(REQUEST_HEADER_PATTERN, 'pattern')
+    assert hasattr(REQUEST_HEADER_PATTERN, "match")
+    assert hasattr(REQUEST_HEADER_PATTERN, "pattern")
 
     # Test matching cases
     assert should_submit_request_headers("repo.anaconda.com", "/any/path") is True
