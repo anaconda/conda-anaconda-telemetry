@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import re
 import time
 import typing
 
@@ -54,10 +55,27 @@ HEADER_INSTALL = f"{HEADER_PREFIX}-Install"
 #: Name of the sys info header
 HEADER_SYS_INFO = f"{HEADER_PREFIX}-Sys-Info"
 
-#: Hosts and paths we want to submit request headers to
-REQUEST_HEADER_PATTERNS = (
-    ("repo.anaconda.com", ""),
-    ("conda.anaconda.org", "/conda-forge/"),
+#: Regex pattern for hosts and paths we want to submit request headers to
+REQUEST_HEADER_PATTERN = re.compile(
+    r"""
+    ^                           # Start of string
+    (?:                         # Non-capturing group for host patterns
+        repo\.anaconda\.        # repo.anaconda. (literal dots)
+        (?:com|cloud)           # Either "com" or "cloud"
+        (?:/.*)?                # Optional path starting with forward slash
+        |                       # OR
+        conda\.anaconda\.org/   # conda.anaconda.org/ (literal dots and slash)
+        (?:                     # Non-capturing group for channel paths
+            conda-forge|        # conda-forge channel
+            main|               # main channel
+            msys2|              # msys2 channel
+            r                   # r channel
+        )
+        /.*                     # Forward slash followed by any characters
+    )
+    $                           # End of string
+    """,
+    re.VERBOSE,
 )
 
 
@@ -242,11 +260,8 @@ def _conda_request_headers() -> Sequence[HeaderWrapper]:
 
 
 def should_submit_request_headers(host: str, path: str) -> bool:
-    """Return a list of hosts and paths we want to submit request headers to."""
-    return any(
-        host == host_pattern and (not path_pattern or path.startswith(path_pattern))
-        for host_pattern, path_pattern in REQUEST_HEADER_PATTERNS
-    )
+    """Return whether we should submit request headers to the given host and path."""
+    return REQUEST_HEADER_PATTERN.match(f"{host}{path}") is not None
 
 
 @hookimpl

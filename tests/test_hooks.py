@@ -280,16 +280,13 @@ def test_should_submit_request_headers(host: str, path: str, expected: bool) -> 
 def test_patterns_validation() -> None:
     """
     Test that should_submit_request_headers works with the actual
-    REQUEST_HEADER_PATTERNS values.
+    REQUEST_HEADER_PATTERN regex.
     """
-    from conda_anaconda_telemetry.hooks import REQUEST_HEADER_PATTERNS
+    from conda_anaconda_telemetry.hooks import REQUEST_HEADER_PATTERN
 
-    # Verify the expected REQUEST_HEADER_PATTERNS structure
-    expected_patterns = (
-        ("repo.anaconda.com", ""),
-        ("conda.anaconda.org", "/conda-forge/"),
-    )
-    assert expected_patterns == REQUEST_HEADER_PATTERNS
+    # Verify the REQUEST_HEADER_PATTERN is a compiled regex
+    assert hasattr(REQUEST_HEADER_PATTERN, 'match')
+    assert hasattr(REQUEST_HEADER_PATTERN, 'pattern')
 
     # Test matching cases
     assert should_submit_request_headers("repo.anaconda.com", "/any/path") is True
