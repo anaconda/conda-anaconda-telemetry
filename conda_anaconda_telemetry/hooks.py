@@ -66,7 +66,7 @@ REQUEST_HEADER_PATTERN = re.compile(
         |                       # OR
         conda\.anaconda\.org/   # conda.anaconda.org/ (literal dots and slash)
         (?:                     # Non-capturing group for channel paths
-            anaconda|            # anaconda channel
+            anaconda|           # anaconda channel
             conda-forge|        # conda-forge channel
             main|               # main channel
             msys2|              # msys2 channel
