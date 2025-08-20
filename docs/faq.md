@@ -31,3 +31,23 @@ We only track commands that make network requests. This includes the following:
 - `conda create`
 - `conda remove`
 - `conda notices`
+
+## When are telemetry headers attached?
+
+Telemetry headers (the `anaconda-telemetry-*` headers) are only added to HTTP
+requests that match a small whitelist of hosts and paths. The plugin attaches
+headers for requests to:
+
+- `repo.anaconda.com` and `repo.anaconda.cloud` (any path), and
+- `conda.anaconda.org/<channel>/...` for the channels: `anaconda`,
+  `conda-forge`, `main`, `msys2`, and `r`.
+
+Examples:
+
+- Requests to `https://repo.anaconda.com/pkgs/main/...` will include telemetry headers.
+- Requests to `https://conda.anaconda.org/conda-forge/...` will include telemetry headers.
+
+This behavior is implemented in `conda_anaconda_telemetry/hooks.py` via a
+compiled regular expression named `REQUEST_HEADER_PATTERN` which performs the
+matching. Limiting submission to these hosts avoids adding telemetry headers to
+unrelated third-party hosts.

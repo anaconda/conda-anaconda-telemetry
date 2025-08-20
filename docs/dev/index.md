@@ -40,7 +40,7 @@ on the [conda plugin for request headers][conda-plugins-request-headers].
 
 The entire plugin consists of just a single `hooks.py` module and currently submits up to
 five headers per request. To respect size limits (typically 8KB), each header has been given
-a character limit, with `Anaconda-Telemetry-Packages` getting the highest limit because it is
+a character limit, with `anaconda-telemetry-packages` getting the highest limit because it is
 inherently larger than the other headers. When a header's data is larger than its limit, the data is
 truncated and submitted as partial data.
 
@@ -48,13 +48,12 @@ Below is a table showing the current headers, along with their size limits:
 
 | Header                                | Size (in bytes) |
 |---------------------------------------|-----------------|
-| `Anaconda-Telemetry-Virtual-Packages` | 500             |
-| `Anaconda-Telemetry-Channels`         | 500             |
-| `Anaconda-Telemetry-Packages`         | 5,000           |
-| `Anaconda-Telemetry-Channels`         | 500             |
-| `Anaconda-Telemetry-Search`           | 500             |
-| `Anaconda-Telemetry-Install`          | 500             |
-| `Anaconda-Telemetry-Sys-Info`         | 500             |
+| `anaconda-telemetry-virtual-packages` | 500             |
+| `anaconda-telemetry-channels`         | 500             |
+| `anaconda-telemetry-packages`         | 5,000           |
+| `anaconda-telemetry-search`           | 500             |
+| `anaconda-telemetry-install`          | 500             |
+| `anaconda-telemetry-sys-info`         | 500             |
 
 
 ```{toctree}
