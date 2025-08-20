@@ -35,25 +35,27 @@ FIELD_SEPARATOR = ";"
 SIZE_LIMIT = 7_000
 
 #: Prefix for all custom headers submitted via this plugin
-HEADER_PREFIX = "Anaconda-Telemetry"
+# Note: header names are normalized to lowercase by the HTTP layer, so keep
+# the prefix lowercased to match the actual header names emitted at runtime.
+HEADER_PREFIX = "anaconda-telemetry"
 
 #: Name of the virtual package header
-HEADER_VIRTUAL_PACKAGES = f"{HEADER_PREFIX}-Virtual-Packages"
+HEADER_VIRTUAL_PACKAGES = f"{HEADER_PREFIX}-virtual-packages"
 
 #: Name of the channels header
-HEADER_CHANNELS = f"{HEADER_PREFIX}-Channels"
+HEADER_CHANNELS = f"{HEADER_PREFIX}-channels"
 
 #: Name of the packages header
-HEADER_PACKAGES = f"{HEADER_PREFIX}-Packages"
+HEADER_PACKAGES = f"{HEADER_PREFIX}-packages"
 
 #: Name of the search header
-HEADER_SEARCH = f"{HEADER_PREFIX}-Search"
+HEADER_SEARCH = f"{HEADER_PREFIX}-search"
 
 #: Name of the install header
-HEADER_INSTALL = f"{HEADER_PREFIX}-Install"
+HEADER_INSTALL = f"{HEADER_PREFIX}-install"
 
 #: Name of the sys info header
-HEADER_SYS_INFO = f"{HEADER_PREFIX}-Sys-Info"
+HEADER_SYS_INFO = f"{HEADER_PREFIX}-sys-info"
 
 #: Regex pattern for hosts and paths we want to submit request headers to
 REQUEST_HEADER_PATTERN = re.compile(
