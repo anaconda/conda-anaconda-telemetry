@@ -141,7 +141,6 @@ jobs:
           # conda not preinstalled in arm64 runners
           miniconda-version: ${{ runner.arch == 'ARM64' && 'latest' || null }}
           architecture: ${{ runner.arch }}
-          conda-version: ${{ matrix.conda-version }}
           channels: defaults
 
       - name: Conda Install
@@ -151,6 +150,7 @@ jobs:
           --file tests/requirements.txt
           --file tests/requirements-ci.txt
           python=${{ matrix.python-version }}
+          conda=${{ matrix.conda-version }}
 
       # TODO: how can we remove this step?
       - name: Install Self
