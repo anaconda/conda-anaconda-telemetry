@@ -78,6 +78,7 @@ jobs:
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
         os: [ubuntu-latest, windows-latest, macos-13, macos-14]
+        conda-version: ['24.11', '25.1', '25.3', '25.5', '25.7']
         exclude:
           # Windows: only test lowest and highest Python versions
           - os: windows-latest
@@ -104,6 +105,12 @@ jobs:
             python-version: '3.11'
           - os: macos-14
             python-version: '3.12'
+          # conda 24.11 doesn't support Python 3.13
+          - python-version: '3.13'
+            conda-version: '24.11'
+          # conda 25.1 doesn't support Python 3.13
+          - python-version: '3.13'
+            conda-version: '25.1'
     runs-on: ${{ matrix.os }}
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
@@ -119,7 +126,7 @@ jobs:
           fetch-depth: 0
 
       - name: Hash + Timestamp
-        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
+        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-Conda${{ matrix.conda-version }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
 
       - name: Cache Conda
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
@@ -143,6 +150,7 @@ jobs:
           --file tests/requirements.txt
           --file tests/requirements-ci.txt
           python=${{ matrix.python-version }}
+          conda=${{ matrix.conda-version }}
 
       # TODO: how can we remove this step?
       - name: Install Self
