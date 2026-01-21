@@ -117,6 +117,11 @@ jobs:
           # conda 25.9 doesn't support Python 3.13
           - python-version: '3.13'
             conda-version: '25.9'
+          # conda 25.9 and 25.11 not yet available on osx-64 (macos-15-intel)
+          - os: macos-15-intel
+            conda-version: '25.9'
+          - os: macos-15-intel
+            conda-version: '25.11'
     runs-on: ${{ matrix.os }}
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
