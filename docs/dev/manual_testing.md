@@ -25,7 +25,7 @@ git clone git@github.com:anaconda/conda-anaconda-telemetry.git
 Use pip to install the plugin:
 
 ```
-pip install -e conda-anaconda-telemetry
+pip install --no-deps -e conda-anaconda-telemetry
 ```
 
 ### Tests
