@@ -22,6 +22,7 @@ from conda_anaconda_telemetry.hooks import (
     conda_post_commands,
     conda_request_headers,
     conda_settings,
+    get_export_header_value,
     should_submit_request_headers,
     timer,
 )
@@ -427,3 +428,58 @@ def test_non_matching_patterns(mocker: MockerFixture, host: str, path: str) -> N
 
     headers = list(conda_request_headers(host, path))
     assert headers == []
+
+
+def test_export_headers_with_file_arg(
+    monkeypatch: MonkeyPatch, mocker: MockerFixture
+) -> None:
+    """
+    Ensure the export header contains the actual filename
+    """
+    monkeypatch.setattr("sys.argv", ["conda", "export", "-f", "my_env.yml"])
+    # We use a matching host so headers are generated
+    host = TEST_HOST
+
+    mock_argparse_args = mocker.MagicMock(
+        cmd="export",
+        channel=None,
+        override_channels=False,
+        export_platforms=None,
+        override_platforms=False,
+        file="my_env.yml",  # Explicit file path
+        format=NULL,
+        no_builds=False,
+        ignore_channels=False,
+        from_history=False,
+        json=False,
+    )
+
+    mock_pm = mocker.MagicMock()
+    # Mocking detection or default exporter
+    mock_exporter = mocker.MagicMock()
+    mock_exporter.name = "yaml"
+    mock_pm.detect_environment_exporter.return_value = mock_exporter
+    # Fallback
+    mock_pm.get_environment_exporter_by_format.return_value = mock_exporter
+
+    mock_context = mocker.MagicMock(
+        _argparse_args=mock_argparse_args,
+        plugin_manager=mock_pm,
+        active_prefix=None,  # Added this to satisfy get_package_list
+        root_prefix="/opt/mock/prefix",  # Added this to satisfy get_package_list
+    )
+
+    mocker.patch("conda_anaconda_telemetry.hooks.context", mock_context)
+    mocker.patch(
+        "conda_anaconda_telemetry.hooks.list_packages", return_value=(None, [])
+    )
+
+    # Clear the LRU cache to ensure we don't get stale results from previous tests
+    # Access the wrapped function because the @timer decorator hides the cache_clear method
+    get_export_header_value.__wrapped__.cache_clear()
+    headers = list(conda_request_headers(host, ""))
+    export_header = next(h for h in headers if h.name == HEADER_EXPORT)
+
+    # Expectation: file:my_env.yml should be present
+    assert "file:my_env.yml" in export_header.value
+

@@ -218,7 +218,7 @@ def get_export_header_value() -> str:
         "override_channels": ("override_channels", str),
         "export_platforms": ("platforms", lambda x: ",".join(x)),
         "override_platforms": ("override_platforms", str),
-        "file": ("file_specified", lambda _: "true"),
+        "file": ("file", str),
         "format": ("format", str),
         "no_builds": ("no_builds", lambda _: "true"),
         "ignore_channels": ("ignore_channels", lambda _: "true"),
