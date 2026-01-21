@@ -9,13 +9,26 @@ import logging
 import re
 import time
 import typing
+from contextlib import suppress
+from urllib.parse import urlparse
 
 from conda.base.context import context
 from conda.cli.main_list import list_packages
 from conda.common.configuration import PrimitiveParameter
+from conda.common.constants import NULL
 from conda.common.url import mask_anaconda_token
+from conda.gateways.connection.session import get_session
 from conda.models.channel import all_channel_urls
-from conda.plugins import CondaRequestHeader, CondaSetting, hookimpl
+from conda.plugins import hookimpl
+from conda.plugins.environment_exporters.environment_yml import (
+    ENVIRONMENT_JSON_FORMAT,
+    ENVIRONMENT_YAML_FORMAT,
+)
+from conda.plugins.types import (
+    CondaPostCommand,
+    CondaRequestHeader,
+    CondaSetting,
+)
 
 try:
     from conda_build import __version__ as conda_build_version
@@ -23,8 +36,8 @@ except ImportError:
     conda_build_version = "n/a"
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
-    from typing import Callable
+    from collections.abc import Iterable, Iterator, Sequence
+    from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +66,9 @@ HEADER_SEARCH = f"{HEADER_PREFIX}-search"
 
 #: Name of the install header
 HEADER_INSTALL = f"{HEADER_PREFIX}-install"
+
+#: Name of the export header
+HEADER_EXPORT = f"{HEADER_PREFIX}-export"
 
 #: Name of the sys info header
 HEADER_SYS_INFO = f"{HEADER_PREFIX}-sys-info"
@@ -113,10 +129,15 @@ def get_virtual_packages() -> tuple[str, ...]:
     )
 
 
+@functools.lru_cache(None)
+def _get_channel_urls() -> tuple[str, ...]:
+    """Return a list of currently configured channel URLs."""
+    return tuple(all_channel_urls(context.channels))
+
+
 def get_channel_urls() -> tuple[str, ...]:
     """Return a list of currently configured channel URLs with tokens masked."""
-    channels = list(all_channel_urls(context.channels))
-    return tuple(mask_anaconda_token(c) for c in channels)
+    return tuple(mask_anaconda_token(c) for c in _get_channel_urls())
 
 
 def get_conda_command() -> str:
@@ -182,6 +203,63 @@ def get_install_arguments_header_value() -> str:
 def get_installed_packages_header_value() -> str:
     """Return ``FIELD_SEPARATOR`` delimited string of install arguments."""
     return FIELD_SEPARATOR.join(get_package_list())
+
+
+@timer
+@functools.lru_cache(None)
+def get_export_header_value() -> str:
+    """Return separated string of export arguments and used exporter."""
+    args = context._argparse_args
+    telemetry_data = {}
+
+    # Map arg attribute to telemetry key and transformation
+    arg_map: dict[str, tuple[str, Callable[[Any], str]]] = {
+        "channel": ("channels", lambda x: ",".join(x)),
+        "override_channels": ("override_channels", str),
+        "export_platforms": ("platforms", lambda x: ",".join(x)),
+        "override_platforms": ("override_platforms", str),
+        "file": ("file_specified", lambda _: "true"),
+        "format": ("format", str),
+        "no_builds": ("no_builds", lambda _: "true"),
+        "ignore_channels": ("ignore_channels", lambda _: "true"),
+        "from_history": ("from_history", lambda _: "true"),
+        "json": ("json", lambda _: "true"),
+    }
+
+    for attr, (key, transform) in arg_map.items():
+        val = getattr(args, attr, None)
+        if val and val is not NULL:
+            telemetry_data[key] = transform(val)
+
+    # Determine exporter
+    target_format = getattr(args, "format", NULL)
+    environment_exporter = None
+
+    if target_format is not NULL:
+        pass
+    elif getattr(args, "file", None):
+        with suppress(Exception):
+            environment_exporter = context.plugin_manager.detect_environment_exporter(
+                args.file
+            )
+            target_format = environment_exporter.name
+    elif getattr(args, "json", None):
+        target_format = ENVIRONMENT_JSON_FORMAT
+    else:
+        target_format = ENVIRONMENT_YAML_FORMAT
+
+    if not environment_exporter:
+        with suppress(Exception):
+            environment_exporter = (
+                context.plugin_manager.get_environment_exporter_by_format(target_format)
+            )
+
+    if environment_exporter:
+        telemetry_data["exporter"] = environment_exporter.name
+
+    return FIELD_SEPARATOR.join(
+        f"{key}:{value}" for key, value in telemetry_data.items()
+    )
 
 
 class HeaderWrapper(typing.NamedTuple):
@@ -259,6 +337,17 @@ def _conda_request_headers() -> Sequence[HeaderWrapper]:
             )
         )
 
+    elif command == "export":
+        custom_headers.append(
+            HeaderWrapper(
+                header=CondaRequestHeader(
+                    name=HEADER_EXPORT,
+                    value=get_export_header_value(),
+                ),
+                size_limit=500,
+            )
+        )
+
     return custom_headers
 
 
@@ -271,12 +360,60 @@ def should_submit_request_headers(host: str, path: str) -> bool:
 def conda_request_headers(host: str, path: str) -> Iterator[CondaRequestHeader]:
     """Return a list of custom headers to be included in the request."""
     try:
-        if context.plugins.anaconda_telemetry and should_submit_request_headers(
-            host, path
-        ):
+        # Check if attribute exists on plugin config
+        # Use getattr with a default value of True because older conda versions
+        # might not have the setting, but we still want telemetry enabled by default
+        enabled = getattr(context.plugins, "anaconda_telemetry", True)
+
+        if enabled and should_submit_request_headers(host, path):
             yield from validate_headers(_conda_request_headers())
     except Exception as exc:
         logger.debug("Failed to collect telemetry data", exc_info=exc)
+
+
+def action_conda_export_telemetry(command: str) -> None:
+    """Submit telemetry data for ``conda export``."""
+    # Check if telemetry is enabled before making request
+    # Since we make a request, and that request triggers the header hook,
+    # and the header hook checks if telemetry is enabled,
+    # we could just fire the request.
+    # But to avoid unnecessary network traffic if disabled:
+    if not getattr(context.plugins, "anaconda_telemetry", True):
+        return
+
+    # Check if the command is "export" just to be safe and satisfy linter ARG001
+    if command != "export":
+        return
+
+    # Determine the best URL to ping.
+    # We start with the default location:
+    url = "https://repo.anaconda.com/"
+
+    # But we check if one of the configured channels is a better match.
+    # This allows us to submit telemetry to the channel that the user is
+    # actually using, provided it matches our ALLOWED hosts/paths.
+    for channel_url in _get_channel_urls():
+        with suppress(Exception):
+            parsed = urlparse(channel_url)
+            if should_submit_request_headers(parsed.netloc, parsed.path):
+                url = channel_url
+                break
+
+    session = get_session(url)
+    with suppress(Exception):
+        # We use a HEAD request to trigger the conda_request_headers hook
+        # which will attach the export telemetry header.
+        session.head(url, timeout=1.0)
+
+
+@hookimpl
+def conda_post_commands() -> Iterable[CondaPostCommand]:
+    """Register post-command functions in conda."""
+    yield CondaPostCommand(
+        name="anaconda-telemetry-export",
+        action=action_conda_export_telemetry,
+        run_for={"export"},
+    )
 
 
 @hookimpl

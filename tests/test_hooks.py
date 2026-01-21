@@ -10,13 +10,16 @@ import pytest
 
 from conda_anaconda_telemetry.hooks import (
     HEADER_CHANNELS,
+    HEADER_EXPORT,
     HEADER_INSTALL,
     HEADER_PACKAGES,
     HEADER_SEARCH,
     HEADER_SYS_INFO,
     HEADER_VIRTUAL_PACKAGES,
+    REQUEST_HEADER_PATTERN,
     SIZE_LIMIT,
     _conda_request_headers,
+    conda_post_commands,
     conda_request_headers,
     conda_settings,
     should_submit_request_headers,
@@ -27,6 +30,9 @@ if TYPE_CHECKING:
     from pytest import CaptureFixture, MonkeyPatch
     from pytest_mock import MockerFixture
 
+
+from conda.common.constants import NULL
+from conda.gateways.connection.session import Session
 
 #: Host used across all tests
 TEST_HOST = "repo.anaconda.com"
@@ -154,13 +160,71 @@ def test_install_headers(
     )
 
 
+@pytest.mark.parametrize(
+    "host,path",
+    [
+        ("repo.anaconda.com", ""),
+        ("conda.anaconda.org", "/conda-forge/"),
+    ],
+)
+def test_export_headers(
+    monkeypatch: MonkeyPatch, mocker: MockerFixture, host: str, path: str
+) -> None:
+    """
+    Ensure export headers are returned when conda export is invoked
+    """
+    monkeypatch.setattr("sys.argv", ["conda", "export"])
+
+    mock_argparse_args = mocker.MagicMock(
+        cmd="export",
+        channel=None,
+        override_channels=False,
+        export_platforms=None,
+        override_platforms=False,
+        file=None,
+        format=NULL,
+        no_builds=False,
+        ignore_channels=False,
+        from_history=False,
+        json=False,
+    )
+
+    mock_pm = mocker.MagicMock()
+    mock_exporter = mocker.MagicMock()
+    mock_exporter.name = "yaml"
+    mock_pm.get_environment_exporter_by_format.return_value = mock_exporter
+
+    mock_context = mocker.MagicMock(
+        _argparse_args=mock_argparse_args,
+        plugin_manager=mock_pm,
+        active_prefix=None,
+        root_prefix="/opt/mock/prefix",
+    )
+
+    mocker.patch("conda_anaconda_telemetry.hooks.context", mock_context)
+    mocker.patch(
+        "conda_anaconda_telemetry.hooks.list_packages", return_value=(None, [])
+    )
+
+    header_names = {header.name for header in tuple(conda_request_headers(host, path))}
+    expected_header_names = {
+        HEADER_SYS_INFO,
+        HEADER_CHANNELS,
+        HEADER_PACKAGES,
+        HEADER_VIRTUAL_PACKAGES,
+        HEADER_EXPORT,
+    }
+
+    assert len(header_names.intersection(expected_header_names)) == len(
+        expected_header_names
+    )
+
+
 def test_disabled_plugin(mocker: MockerFixture) -> None:
     """
     Make sure that nothing is returned when the plugin is disabled via settings
     """
-    mocker.patch(
-        "conda_anaconda_telemetry.hooks.context.plugins.anaconda_telemetry", False
-    )
+    mocker.patch("conda_anaconda_telemetry.hooks.getattr", return_value=False)
     assert not tuple(conda_request_headers(TEST_HOST, ""))
 
 
@@ -192,6 +256,43 @@ def test_conda_settings() -> None:
     assert settings[0].name == "anaconda_telemetry"
     assert settings[0].description == "Whether Anaconda Telemetry is enabled"
     assert settings[0].parameter.default.value is True
+
+
+def test_conda_post_commands(mocker: MockerFixture) -> None:
+    """
+    Ensure the correct conda post commands are returned and trigger requests
+    """
+    mock_session = mocker.Mock(spec=Session)
+    mocker.patch(
+        "conda_anaconda_telemetry.hooks.get_session", return_value=mock_session
+    )
+
+    # Test with default channels (should pick repo.anaconda.com or similar default)
+    # We mock _get_channel_urls to return a list of channels
+    mocker.patch(
+        "conda_anaconda_telemetry.hooks._get_channel_urls",
+        return_value=["https://prohibited.com/channel"],
+    )
+
+    post_commands = list(conda_post_commands())
+
+    assert len(post_commands) == 1
+    assert post_commands[0].name == "anaconda-telemetry-export"
+    assert post_commands[0].run_for == {"export"}
+
+    # Run the action with prohibited channel -> should fallback to repo.anaconda.com
+    post_commands[0].action("export")
+    mock_session.head.assert_called_with("https://repo.anaconda.com/", timeout=1.0)
+
+    # Test with allowed channel
+    mocker.patch(
+        "conda_anaconda_telemetry.hooks._get_channel_urls",
+        return_value=["https://conda.anaconda.org/conda-forge/"],
+    )
+    post_commands[0].action("export")
+    mock_session.head.assert_called_with(
+        "https://conda.anaconda.org/conda-forge/", timeout=1.0
+    )
 
 
 def test_exception_handling(mocker: MockerFixture, caplog: CaptureFixture) -> None:
@@ -282,7 +383,6 @@ def test_patterns_validation() -> None:
     Test that should_submit_request_headers works with the actual
     REQUEST_HEADER_PATTERN regex.
     """
-    from conda_anaconda_telemetry.hooks import REQUEST_HEADER_PATTERN
 
     # Verify the REQUEST_HEADER_PATTERN is a compiled regex
     assert hasattr(REQUEST_HEADER_PATTERN, "match")

@@ -54,6 +54,22 @@ Expected headers
 }
 ```
 
+#### Test to ensure export telemetry is being submitted
+
+Test command:
+
+```
+conda export -v -v -v
+```
+
+Expected headers
+
+```json
+{
+  "anaconda-telemetry-export": "file_specified:true;format:yaml;exporter:yaml"
+}
+```
+
 #### Test to ensure install/create terms are being submitted
 
 Test command:
