@@ -15,14 +15,13 @@ conda install --name base conda-anaconda-telemetry
 
 ## Disabling
 
-To disable this plugin, you can either add the following to your `.condarc` file:
+To disable this plugin, you can either use the `conda config` command:
 
-```yaml
-plugins:
-  anaconda_telemetry: false
+```
+conda config --set plugins.anaconda_telemetry false
 ```
 
-Or remove it from your base environment:
+Or remove this plugin from your base environment:
 
 ```commandline
 conda remove --name base conda-anaconda-telemetry
