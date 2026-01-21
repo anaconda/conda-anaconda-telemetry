@@ -475,11 +475,11 @@ def test_export_headers_with_file_arg(
     )
 
     # Clear the LRU cache to ensure we don't get stale results from previous tests
-    # Access the wrapped function because the @timer decorator hides the cache_clear method
-    get_export_header_value.__wrapped__.cache_clear()
+    # Access the wrapped function because the @timer decorator hides the cache_clear
+    # method
+    get_export_header_value.__wrapped__.cache_clear()  # type: ignore[attr-defined]
     headers = list(conda_request_headers(host, ""))
     export_header = next(h for h in headers if h.name == HEADER_EXPORT)
 
     # Expectation: file:my_env.yml should be present
     assert "file:my_env.yml" in export_header.value
-
