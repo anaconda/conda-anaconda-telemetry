@@ -61,7 +61,7 @@ services:
       retries: 20
 
   otel_collector:
-    image: otel/opentelemetry-collector-contrib:latest@sha256:bcb6d6d0e56645a75cbce0b7aeb3cf7c304299788bc573080b0351eddc786c9b
+    image: otel/opentelemetry-collector-contrib:latest@sha256:213886eb6407af91b87fa47551c3632be1a6419ff3a5114ef1e6fc364628496f
     container_name: ${OTEL_LOCAL_CONTAINER_NAME}
     volumes:
       - ./otel-collector-config.yaml:/etc/otel/config.yaml
