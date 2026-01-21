@@ -20,15 +20,28 @@ from conda.common.url import mask_anaconda_token
 from conda.gateways.connection.session import get_session
 from conda.models.channel import all_channel_urls
 from conda.plugins import hookimpl
-from conda.plugins.environment_exporters.environment_yml import (
-    ENVIRONMENT_JSON_FORMAT,
-    ENVIRONMENT_YAML_FORMAT,
-)
+try:
+    from conda.plugins.environment_exporters.environment_yml import (
+        ENVIRONMENT_JSON_FORMAT,
+        ENVIRONMENT_YAML_FORMAT,
+    )
+
+    HAS_ENVIRONMENT_EXPORTERS = True
+except ImportError:
+    # Available since conda 24.11.0
+    ENVIRONMENT_JSON_FORMAT = "json"
+    ENVIRONMENT_YAML_FORMAT = "yaml"
+    HAS_ENVIRONMENT_EXPORTERS = False
 from conda.plugins.types import (
-    CondaPostCommand,
     CondaRequestHeader,
     CondaSetting,
 )
+
+try:
+    from conda.plugins.types import CondaPostCommand
+except ImportError:
+    CondaPostCommand = None
+
 
 try:
     from conda_build import __version__ as conda_build_version
@@ -337,7 +350,7 @@ def _conda_request_headers() -> Sequence[HeaderWrapper]:
             )
         )
 
-    elif command == "export":
+    elif command == "export" and HAS_ENVIRONMENT_EXPORTERS:
         custom_headers.append(
             HeaderWrapper(
                 header=CondaRequestHeader(
@@ -409,11 +422,12 @@ def action_conda_export_telemetry(command: str) -> None:
 @hookimpl
 def conda_post_commands() -> Iterable[CondaPostCommand]:
     """Register post-command functions in conda."""
-    yield CondaPostCommand(
-        name="anaconda-telemetry-export",
-        action=action_conda_export_telemetry,
-        run_for={"export"},
-    )
+    if CondaPostCommand and HAS_ENVIRONMENT_EXPORTERS:
+        yield CondaPostCommand(
+            name="anaconda-telemetry-export",
+            action=action_conda_export_telemetry,
+            run_for={"export"},
+        )
 
 
 @hookimpl

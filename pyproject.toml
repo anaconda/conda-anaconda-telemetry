@@ -18,7 +18,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "conda >=25.7.0",
+  "conda >=24.11.0",
 ]
 description = "A conda plugin for Anaconda Telemetry"
 dynamic = [
