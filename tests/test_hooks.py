@@ -25,6 +25,7 @@ from conda_anaconda_telemetry.hooks import (
     get_export_header_value,
     should_submit_request_headers,
     timer,
+    HAS_ENVIRONMENT_EXPORTERS,
 )
 
 if TYPE_CHECKING:
@@ -162,18 +163,29 @@ def test_install_headers(
 
 
 @pytest.mark.parametrize(
-    "host,path",
+    "host,path,is_export_enabled",
     [
-        ("repo.anaconda.com", ""),
-        ("conda.anaconda.org", "/conda-forge/"),
+        ("repo.anaconda.com", "", True),
+        ("conda.anaconda.org", "/conda-forge/", True),
+        ("repo.anaconda.com", "", False),
+        ("conda.anaconda.org", "/conda-forge/", False),
     ],
 )
 def test_export_headers(
-    monkeypatch: MonkeyPatch, mocker: MockerFixture, host: str, path: str
+    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
+    host: str,
+    path: str,
+    is_export_enabled: bool,
 ) -> None:
     """
     Ensure export headers are returned when conda export is invoked
     """
+    # Patch HAS_ENVIRONMENT_EXPORTERS in the hooks module where it's used
+    mocker.patch(
+        "conda_anaconda_telemetry.hooks.HAS_ENVIRONMENT_EXPORTERS", is_export_enabled
+    )
+
     monkeypatch.setattr("sys.argv", ["conda", "export"])
 
     mock_argparse_args = mocker.MagicMock(
@@ -213,8 +225,10 @@ def test_export_headers(
         HEADER_CHANNELS,
         HEADER_PACKAGES,
         HEADER_VIRTUAL_PACKAGES,
-        HEADER_EXPORT,
     }
+
+    if is_export_enabled:
+        expected_header_names.add(HEADER_EXPORT)
 
     assert len(header_names.intersection(expected_header_names)) == len(
         expected_header_names
@@ -259,10 +273,15 @@ def test_conda_settings() -> None:
     assert settings[0].parameter.default.value is True
 
 
-def test_conda_post_commands(mocker: MockerFixture) -> None:
+@pytest.mark.parametrize("is_export_enabled", [True, False])
+def test_conda_post_commands(mocker: MockerFixture, is_export_enabled: bool) -> None:
     """
     Ensure the correct conda post commands are returned and trigger requests
     """
+    mocker.patch(
+        "conda_anaconda_telemetry.hooks.HAS_ENVIRONMENT_EXPORTERS", is_export_enabled
+    )
+
     mock_session = mocker.Mock(spec=Session)
     mocker.patch(
         "conda_anaconda_telemetry.hooks.get_session", return_value=mock_session
@@ -276,6 +295,10 @@ def test_conda_post_commands(mocker: MockerFixture) -> None:
     )
 
     post_commands = list(conda_post_commands())
+
+    if not is_export_enabled:
+        assert len(post_commands) == 0
+        return
 
     assert len(post_commands) == 1
     assert post_commands[0].name == "anaconda-telemetry-export"
@@ -430,12 +453,17 @@ def test_non_matching_patterns(mocker: MockerFixture, host: str, path: str) -> N
     assert headers == []
 
 
+@pytest.mark.parametrize("is_export_enabled", [True, False])
 def test_export_headers_with_file_arg(
-    monkeypatch: MonkeyPatch, mocker: MockerFixture
+    monkeypatch: MonkeyPatch, mocker: MockerFixture, is_export_enabled: bool
 ) -> None:
     """
     Ensure the export header contains the actual filename
     """
+    mocker.patch(
+        "conda_anaconda_telemetry.hooks.HAS_ENVIRONMENT_EXPORTERS", is_export_enabled
+    )
+
     monkeypatch.setattr("sys.argv", ["conda", "export", "-f", "my_env.yml"])
     # We use a matching host so headers are generated
     host = TEST_HOST
@@ -479,7 +507,9 @@ def test_export_headers_with_file_arg(
     # method
     get_export_header_value.__wrapped__.cache_clear()  # type: ignore[attr-defined]
     headers = list(conda_request_headers(host, ""))
-    export_header = next(h for h in headers if h.name == HEADER_EXPORT)
 
-    # Expectation: file:my_env.yml should be present
-    assert "file:my_env.yml" in export_header.value
+    if is_export_enabled:
+        export_header = next(h for h in headers if h.name == HEADER_EXPORT)
+        assert "file:my_env.yml" in export_header.value
+    else:
+        assert HEADER_EXPORT not in {h.name for h in headers}
