@@ -5,7 +5,7 @@ hatchling >=1.12.2
 # renovate: datasource=conda depName=main/hatch-vcs
 hatch-vcs >=0.2.0
 # renovate: datasource=conda depName=main/pytest
-pytest ==8.4.1
+pytest ==8.4.2
 # renovate: datasource=conda depName=main/pytest-cov
 pytest-cov ==6.0.0
 # renovate: datasource=conda depName=main/pytest-mock
