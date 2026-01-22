@@ -20,6 +20,7 @@ from conda.common.url import mask_anaconda_token
 from conda.gateways.connection.session import get_session
 from conda.models.channel import all_channel_urls
 from conda.plugins import hookimpl
+
 try:
     from conda.plugins.environment_exporters.environment_yml import (
         ENVIRONMENT_JSON_FORMAT,

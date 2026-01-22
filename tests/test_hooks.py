@@ -25,7 +25,6 @@ from conda_anaconda_telemetry.hooks import (
     get_export_header_value,
     should_submit_request_headers,
     timer,
-    HAS_ENVIRONMENT_EXPORTERS,
 )
 
 if TYPE_CHECKING:
