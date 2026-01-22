@@ -76,34 +76,28 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
-        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
-        conda-version: ['24.11', '25.1', '25.3', '25.5', '25.7']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+        os: [ubuntu-latest, windows-latest, macos-15-intel, macos-latest]
+        conda-version: ['24.11', '25.1', '25.3', '25.5', '25.7', '25.9', '25.11']
         exclude:
           # Windows: only test lowest and highest Python versions
           - os: windows-latest
-            python-version: '3.10'
-          - os: windows-latest
             python-version: '3.11'
           - os: windows-latest
             python-version: '3.12'
-          # macOS x86_64: only test lowest Python version
-          - os: macos-13
-            python-version: '3.10'
-          - os: macos-13
+          # macOS x86_64: only test lowest (3.10) Python version
+          - os: macos-15-intel
             python-version: '3.11'
-          - os: macos-13
+          - os: macos-15-intel
             python-version: '3.12'
-          - os: macos-13
+          - os: macos-15-intel
             python-version: '3.13'
-          # macOS arm64: only test highest Python version
-          - os: macos-14
-            python-version: '3.9'
-          - os: macos-14
+          # macOS arm64: only test highest (3.13) Python version
+          - os: macos-latest
             python-version: '3.10'
-          - os: macos-14
+          - os: macos-latest
             python-version: '3.11'
-          - os: macos-14
+          - os: macos-latest
             python-version: '3.12'
           # conda 24.11 doesn't support Python 3.13
           - python-version: '3.13'
@@ -111,6 +105,23 @@ jobs:
           # conda 25.1 doesn't support Python 3.13
           - python-version: '3.13'
             conda-version: '25.1'
+          # conda 25.3 doesn't support Python 3.13
+          - python-version: '3.13'
+            conda-version: '25.3'
+          # conda 25.5 doesn't support Python 3.13
+          - python-version: '3.13'
+            conda-version: '25.5'
+          # conda 25.7 doesn't support Python 3.13
+          - python-version: '3.13'
+            conda-version: '25.7'
+          # conda 25.9 doesn't support Python 3.13
+          - python-version: '3.13'
+            conda-version: '25.9'
+          # conda 25.9 and 25.11 not yet available on osx-64 (macos-15-intel)
+          - os: macos-15-intel
+            conda-version: '25.9'
+          - os: macos-15-intel
+            conda-version: '25.11'
     runs-on: ${{ matrix.os }}
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
