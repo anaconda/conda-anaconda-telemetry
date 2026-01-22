@@ -7,7 +7,7 @@ hatch-vcs >=0.2.0
 # renovate: datasource=conda depName=main/pytest
 pytest ==8.4.1
 # renovate: datasource=conda depName=main/pytest-cov
-pytest-cov ==6.0.0
+pytest-cov ==7.0.0
 # renovate: datasource=conda depName=main/pytest-mock
 pytest-mock ==3.14.0
 # renovate: datasource=conda depName=main/pytest-xdist
