@@ -20,19 +20,19 @@ repos:
       - id: check-merge-conflict
   # Python verification and formatting
   - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.5.5
+    rev: v1.5.6
     hooks:
       # auto inject license blurb
       - id: insert-license
         files: \.py$
         args: [--license-filepath, .github/disclaimer.txt, --no-extra-eol]
   - repo: https://github.com/adamchainz/blacken-docs
-    rev: 1.19.1
+    rev: 1.20.0
     hooks:
       # auto format Python codes within docstrings
       - id: blacken-docs
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.9
+    rev: v0.14.13
     hooks:
       # lint & attempt to correct failures (e.g. pyupgrade)
       - id: ruff
@@ -40,7 +40,7 @@ repos:
       # compatible replacement for black
       - id: ruff-format
   - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
-    rev: v2.15.0
+    rev: v2.16.0
     hooks:
       - id: pretty-format-toml
         args: [--autofix, --trailing-commas]
@@ -55,13 +55,13 @@ repos:
             recipe/meta.yaml
           )
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.33.3
+    rev: 0.36.0
     hooks:
       # verify github syntaxes
       - id: check-github-workflows
       - id: check-renovate
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.17.1
+    rev: v1.19.1
     hooks:
       - id: mypy
         additional_dependencies: [types-requests]
