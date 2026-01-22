@@ -66,7 +66,7 @@ Expected headers
 
 ```json
 {
-  "anaconda-telemetry-export": "file_specified:true;format:yaml;exporter:yaml"
+  "anaconda-telemetry-export": "exporter:yaml"
 }
 ```
 
