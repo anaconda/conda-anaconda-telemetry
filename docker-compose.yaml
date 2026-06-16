@@ -60,18 +60,6 @@ services:
       timeout: 10s
       retries: 20
 
-  otel_collector:
-    image: otel/opentelemetry-collector-contrib:latest@sha256:f6e429c1052ab50f85a7afa5f7e32f25931697751622b0e1f453d10f79a1df3c
-    container_name: ${OTEL_LOCAL_CONTAINER_NAME}
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel/config.yaml
-    ports:
-      - 127.0.0.1:${OTEL_LOCAL_PORT}:4317
-      - 127.0.0.1:${OTEL_LOCAL_ZPAGES_PORT}:55679
-      - 127.0.0.1:${OTEL_LOCAL_HEALTH_CHECK_PORT}:13133
-      - 127.0.0.1:${OTEL_LOCAL_PPROF_PORT}:1888
-    command: --config /etc/otel/config.yaml
-
 volumes:
   dev-elasticsearch:
   dev-kibana:
