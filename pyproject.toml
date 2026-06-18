@@ -19,6 +19,7 @@ classifiers = [
 ]
 dependencies = [
   "conda >=24.11",
+  "anaconda-opentelemetry >=1.2.0",
 ]
 description = "A conda plugin for Anaconda Telemetry"
 dynamic = [
@@ -31,6 +32,7 @@ requires-python = ">=3.10"
 
 [project.entry-points.conda]
 conda-anaconda-telemetry = "conda_anaconda_telemetry.hooks"
+conda-anaconda-opentelemetry = "conda_anaconda_telemetry.plugin"
 
 [tool.coverage.report]
 exclude_lines = [
