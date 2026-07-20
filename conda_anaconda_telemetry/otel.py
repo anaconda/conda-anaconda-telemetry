@@ -1,3 +1,9 @@
+# Copyright (C) 2026 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
+"""Anaconda OpenTelemetry SDK configuration and control functions."""
+
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass, field
 from typing import Any
@@ -10,8 +16,7 @@ from conda_anaconda_telemetry import APP_NAME, APP_VERSION
 
 
 @dataclass
-class OpenTelemetry:
-    """OpenTelemetry configuration and control functions."""
+class AnacondaTelemetry:
     service_name: str = APP_NAME
     service_version: str = APP_VERSION.rsplit(".", 1)[0]
     platform: str = "conda"
@@ -57,10 +62,18 @@ class OpenTelemetry:
         )
         return attributes
     
-    def initialize(self):
+    def initialize(self) -> None:
         self.config = self._make_config()
         self.attributes = self._make_attributes()
         sig.initialize_telemetry(self.config, self.attributes, signal_types=["logging"])
+
+    def is_initialized(self) -> bool:
+        if getattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED") is False:
+            return False
+        elif getattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED") is True:
+            return True
+        else:
+            raise ValueError("Anaconda Telemetry is in an unknown state")
 
     def send_event(self, event_name: str, body: str, attributes: dict[str, Any] = {}) -> None:
         sig.send_event(
