@@ -15,6 +15,7 @@ def test_conda_exception_observers_hook():
         capture_output=True,
         text=True,
     )
+    print(result.stdout)
     match = re.search(r"\{.*\}", result.stdout, re.DOTALL)
     
     assert match is not None
