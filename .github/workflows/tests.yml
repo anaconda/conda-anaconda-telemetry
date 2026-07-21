@@ -118,7 +118,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
-      ATEL_ENVIRONMENT: local
+      ATEL_ENVIRONMENT: "local"
 
     steps:
       # Clean checkout of specific git ref needed for package metadata version
