@@ -176,6 +176,7 @@ jobs:
         run: >
           conda run --name test
           pytest
+          -vv
           --doctest-modules
           --cov=conda_anaconda_telemetry
           --basetemp=${{ runner.temp }}
