@@ -57,8 +57,8 @@ class AnacondaTelemetry:
     def _make_attributes(self) -> ResourceAttributes:
         attributes = ResourceAttributes(self.service_name, self.service_version, anon_usage = True)
         attributes.set_attributes(
-                platform = self.platform,
-                environment = self.environment,
+                platform=self.platform,
+                environment=self.environment,
         )
         return attributes
     
