@@ -183,7 +183,6 @@ jobs:
           --doctest-modules
           --cov=conda_anaconda_telemetry
           --basetemp=${{ runner.temp }}
-          -n auto
 
 
   build_docs:
