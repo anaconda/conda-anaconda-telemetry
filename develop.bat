@@ -14,5 +14,5 @@
 @DOSKEY conda="%CONDA_BAT%" $*
 
 @CALL pip "install" "-e" "."
-
+@CALL pre-commit "install"
 @SET "ATEL_ENVIRONMENT=develop"
