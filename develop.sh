@@ -16,4 +16,4 @@ pip install -e .
 pre-commit install
 
 CONDA_EXE="$CONDA_PREFIX/condabin/conda"
-export ATEL_ENVIRONMENT="develop"
+export ATEL_ENVIRONMENT="development"
