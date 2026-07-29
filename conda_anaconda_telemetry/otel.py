@@ -32,10 +32,6 @@ class Environment(Enum):
     STAGING = "staging"
     PRODUCTION = "production"
 
-    def __str__(self) -> str:
-        """Return the string value."""
-        return self.value
-
 
 @dataclass
 class AnacondaTelemetry:
@@ -44,7 +40,6 @@ class AnacondaTelemetry:
     service_name: str = APP_NAME
     service_version: str = APP_VERSION.partition(".dev")[0]
     platform: str = "conda"
-    # Literal matches the requirements from anaconda-opentelemetry.
     environment: Environment = field(
         init=False,
         default_factory=lambda: Environment(
