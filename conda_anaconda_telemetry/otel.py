@@ -67,13 +67,11 @@ class AnacondaTelemetry:
             raise ValueError("A valid default endpoint must be set.")
 
     def _make_config(self) -> Configuration:
+        config = Configuration(default_endpoint=self.default_endpoint)
         if "localhost" in self.default_endpoint.lower():
             # Set the configuration for test and development
-            config = Configuration(default_endpoint=self.default_endpoint)
             config.set_skip_internet_check(True)
             config.set_console_exporter(True)
-        else:
-            config = Configuration(default_endpoint=self.default_endpoint)
         return config
 
     def _make_attributes(self) -> ResourceAttributes:

@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 from conda import plugins
 from conda.base.context import context
-from conda.exceptions import PackagesNotFoundError
 
 from conda_anaconda_telemetry.otel import AnacondaTelemetry
 
@@ -29,12 +28,8 @@ def report_error(event: CondaExceptionEvent) -> None:
     """Report an error to telemetry."""
     if context.plugins.anaconda_telemetry:  # Confirm plugin is enabled
         conda_command = context._argparse_args.cmd
-        # Only send telemetry for PackagesNotFoundError (and its subclasses)
-        # during install command
-        if not (
-            isinstance(event.exc_value, PackagesNotFoundError)
-            and conda_command == "install"
-        ):
+        # Only send telemetry during install command
+        if conda_command != "install":
             return
         try:
             telemetry = AnacondaTelemetry()
