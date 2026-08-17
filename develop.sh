@@ -13,6 +13,5 @@ CONDA_ENV_DIR="./env"
 conda create -p "$CONDA_ENV_DIR" --file tests/requirements.txt --file tests/requirements-ci.txt --yes
 conda activate "$CONDA_ENV_DIR"
 pip install -e .
-pre-commit install
 
 CONDA_EXE="$CONDA_PREFIX/condabin/conda"
