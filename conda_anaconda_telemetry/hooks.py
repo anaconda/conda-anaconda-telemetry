@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Anaconda, Inc
+# Copyright (C) 2024-2026 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
 """Conda plugin that adds telemetry headers to requests made by conda."""
 
