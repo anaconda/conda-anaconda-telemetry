@@ -142,6 +142,40 @@ def test_report_error_initialize_failure_is_consumed(mocker: MockerFixture) -> N
     telemetry.send_event.assert_not_called()
 
 
+def test_report_error_signal_payload_baseline(
+    mocker: MockerFixture,
+) -> None:
+    """Checks what's actually in the signal payload today.
+
+    Only the anaconda_opentelemetry boundary is mocked, so this uses the real
+    AnacondaTelemetry code. Both attribute dicts are empty right now since no
+    resource or event attributes have been added yet. Update this test as
+    those get added, so a missing field fails here.
+    """
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context._argparse_args",
+        mocker.MagicMock(cmd="install"),
+    )
+    mock_initialize = mocker.patch(
+        "conda_anaconda_telemetry.otel.sig.initialize_telemetry"
+    )
+    mock_send_event = mocker.patch("conda_anaconda_telemetry.otel.sig.send_event")
+
+    event = SimpleNamespace(exc_type=PackagesNotFoundError)
+    report_error(event)
+
+    resource_attributes = mock_initialize.call_args.kwargs["attributes"]
+    attributes = resource_attributes._get_attributes()
+    assert attributes["parameters"] == {}
+
+    mock_send_event.assert_called_once_with(
+        event_name="conda-install", body="", attributes={}
+    )
+
+
 def test_report_error_send_event_failure_is_consumed(mocker: MockerFixture) -> None:
     """If send_event() raises, the failure is consumed rather than propagating."""
     mocker.patch(
