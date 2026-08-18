@@ -33,24 +33,18 @@ def report_error(event: CondaExceptionEvent) -> None:
             return
         try:
             telemetry = AnacondaTelemetry()
-            logger.info("Initializing telemetry...")
             telemetry.initialize()
-            logger.info("Telemetry initialized successfully!")
-        except Exception as e:
-            logger.debug("Failed to initialize telemetry", exc_info=e)
-            return
-        logger.info(
-            "Using send_event to send a signal for conda exception event: %s",
-            event.exc_type,
-        )
-        try:
-            event_name = f"conda-{conda_command}"
-            event_body = ""
-            telemetry.send_event(event_name, event_body)
         except Exception as e:
             logger.debug(
-                "Failed to send telemetry for conda exception event", exc_info=e
+                "Failed to initialize telemetry for %s", event.exc_type, exc_info=e
             )
+            return
+        try:
+            # anaconda-client's telemetry event naming convention: bare verb
+            # for the command, no "conda-" prefix.
+            telemetry.send_event(conda_command, "")
+        except Exception as e:
+            logger.debug("Failed to send telemetry for %s", event.exc_type, exc_info=e)
 
 
 @plugins.hookimpl
