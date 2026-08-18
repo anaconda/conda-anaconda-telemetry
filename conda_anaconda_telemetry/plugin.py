@@ -40,9 +40,9 @@ def report_error(event: CondaExceptionEvent) -> None:
             )
             return
         try:
-            # anaconda-client's telemetry event naming convention: bare verb
-            # for the command, no "conda-" prefix.
-            telemetry.send_event(conda_command, "")
+            # anaconda-client's telemetry event naming convention
+            event_name = f"{conda_command}.error"
+            telemetry.send_event(event_name, "")
         except Exception as e:
             logger.debug("Failed to send telemetry for %s", event.exc_type, exc_info=e)
 
