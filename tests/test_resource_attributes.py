@@ -11,7 +11,7 @@ from conda_anaconda_telemetry.resource_attributes import (
     get_ci_detected,
     get_conda_attributes,
     get_installer_attributes,
-    get_plugin_names,
+    get_plugin_settings,
 )
 
 if TYPE_CHECKING:
@@ -80,23 +80,18 @@ def test_get_ci_detected(
     assert get_ci_detected() is expected
 
 
-def test_get_plugin_names(mocker: MockerFixture) -> None:
-    mock_manager = mocker.MagicMock()
-    mock_manager.list_name_plugin.return_value = [
-        ("conda_anaconda_telemetry.plugin", object()),
-        ("conda_lockfiles.plugin", object()),
-    ]
-    # context.plugin_manager is a read-only property, so the whole `context`
+def test_get_plugin_settings(mocker: MockerFixture) -> None:
+    """Returns the plugins: settings from .condarc, not a list of plugins."""
+    mock_plugins = mocker.MagicMock(parameter_names=("my_plugin",))
+    mock_plugins.my_plugin = False
+    # context.plugins is a read-only property, so the whole `context`
     # reference used by this module is swapped out instead of patching it.
     mocker.patch(
         "conda_anaconda_telemetry.resource_attributes.context",
-        mocker.MagicMock(plugin_manager=mock_manager),
+        mocker.MagicMock(plugins=mock_plugins),
     )
 
-    assert get_plugin_names() == [
-        "conda_anaconda_telemetry.plugin",
-        "conda_lockfiles.plugin",
-    ]
+    assert get_plugin_settings() == {"my_plugin": False}
 
 
 def test_get_conda_attributes(mocker: MockerFixture) -> None:
@@ -122,8 +117,8 @@ def test_get_conda_attributes(mocker: MockerFixture) -> None:
         return_value=True,
     )
     mocker.patch(
-        "conda_anaconda_telemetry.resource_attributes.get_plugin_names",
-        return_value=["conda_anaconda_telemetry.plugin"],
+        "conda_anaconda_telemetry.resource_attributes.get_plugin_settings",
+        return_value={"my_plugin": False},
     )
 
     assert get_conda_attributes() == {
@@ -132,5 +127,5 @@ def test_get_conda_attributes(mocker: MockerFixture) -> None:
         "conda.solver": "asolver",
         "conda.environment_name": "myenv",
         "conda.ci_detected": "true",
-        "conda.plugins": '["conda_anaconda_telemetry.plugin"]',
+        "conda.plugins": '{"my_plugin": false}',
     }

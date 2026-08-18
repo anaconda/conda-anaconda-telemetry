@@ -70,9 +70,14 @@ def get_ci_detected() -> bool:
     return bool(os.environ.get("CI"))
 
 
-def get_plugin_names() -> list[str]:
-    """Return the names of all currently registered conda plugins."""
-    return [name for name, _ in context.plugin_manager.list_name_plugin()]
+def get_plugin_settings() -> dict[str, object]:
+    """Return the current value of every registered plugin setting.
+
+    This is the ``plugins:`` key from .condarc - plugin-specific settings
+    (most commonly used to disable a plugin), not a list of plugin names.
+    """
+    plugins = context.plugins
+    return {name: getattr(plugins, name) for name in plugins.parameter_names}
 
 
 def get_conda_attributes() -> dict[str, str]:
@@ -80,8 +85,8 @@ def get_conda_attributes() -> dict[str, str]:
 
     ``ResourceAttributes.set_attributes()`` stores wildcard values via plain
     ``str()``, not ``json.dumps()`` - so non-string values (the bool and the
-    list here) are JSON-encoded ourselves first, otherwise they'd land in the
-    signal as Python's ``repr()`` (single-quoted lists), which isn't
+    dict here) are JSON-encoded ourselves first, otherwise they'd land in the
+    signal as Python's ``repr()`` (single-quoted dicts), which isn't
     valid JSON.
     """
     return {
@@ -90,5 +95,5 @@ def get_conda_attributes() -> dict[str, str]:
         "conda.solver": get_solver(),
         "conda.environment_name": get_environment_name(),
         "conda.ci_detected": json.dumps(get_ci_detected()),
-        "conda.plugins": json.dumps(get_plugin_names()),
+        "conda.plugins": json.dumps(get_plugin_settings()),
     }
