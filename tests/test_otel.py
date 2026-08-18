@@ -39,11 +39,38 @@ def test_anaconda_telemetry(
     assert getattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED") is True
 
 
-def test_anaconda_telemetry_invalid_scheme(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An endpoint with an unsupported scheme raises instead of silently
-    accepting a broken default_endpoint.
+@pytest.mark.parametrize(
+    "default_endpoint",
+    ["ftp://example.com", "not-a-url"],
+)
+def test_anaconda_telemetry_invalid_scheme(
+    monkeypatch: pytest.MonkeyPatch, default_endpoint: str
+) -> None:
+    """An endpoint with an unsupported or missing scheme raises instead of
+    silently accepting a broken default_endpoint.
     """
-    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", "ftp://example.com")
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", default_endpoint)
 
     with pytest.raises(ValueError, match=r"^A valid default endpoint must be set\.$"):
         AnacondaTelemetry()
+
+
+@pytest.mark.parametrize(
+    "default_endpoint,expected",
+    [
+        ("http://localhost:4318", True),
+        ("https://public.telemetry.anaconda.com/v1/logs", False),
+    ],
+)
+def test_make_config(
+    monkeypatch: pytest.MonkeyPatch, default_endpoint: str, expected: bool
+) -> None:
+    """Only a localhost endpoint skips the internet check and uses the
+    console exporter.
+    """
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", default_endpoint)
+
+    config = AnacondaTelemetry()._make_config()
+
+    assert config._get_skip_internet_check() is expected
+    assert config._get_console_exporter() is expected
