@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import anaconda_opentelemetry.signals as sig
 import pytest
+from opentelemetry.sdk._logs.export import ConsoleLogExporter
 
 from conda_anaconda_telemetry.otel import AnacondaTelemetry
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 @pytest.mark.parametrize(

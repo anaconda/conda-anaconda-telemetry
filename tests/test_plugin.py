@@ -6,6 +6,7 @@ import sys
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
+import conda
 import pytest
 from conda.exceptions import PackagesNotFoundError
 from conda.plugins.hookspec import CondaSpecs
@@ -148,9 +149,8 @@ def test_report_error_signal_payload_baseline(
     """Checks what's actually in the signal payload today.
 
     Only the anaconda_opentelemetry boundary is mocked, so this uses the real
-    AnacondaTelemetry code. Both attribute dicts are empty right now since no
-    resource or event attributes have been added yet. Update this test as
-    those get added, so a missing field fails here.
+    AnacondaTelemetry code. Update this test as attributes are added, changed,
+    or removed, so a missing/renamed field fails here.
     """
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
@@ -169,7 +169,20 @@ def test_report_error_signal_payload_baseline(
 
     resource_attributes = mock_initialize.call_args.kwargs["attributes"]
     attributes = resource_attributes._get_attributes()
-    assert attributes["parameters"] == {}
+    parameters = attributes["parameters"]
+
+    # installer.* is intentionally excluded here since it depends on a
+    # .installer.info file that isn't present in this test environment; it's
+    # covered separately in tests/test_resource_attributes.py.
+    assert set(parameters) == {
+        "conda.version",
+        "conda.python_version",
+        "conda.solver",
+        "conda.environment_name",
+        "conda.ci_detected",
+        "conda.plugins",
+    }
+    assert parameters["conda.version"] == conda.__version__
 
     mock_send_event.assert_called_once_with(
         event_name="install.error", body="", attributes={}
