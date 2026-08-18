@@ -113,7 +113,7 @@ def test_report_error_happy_path(
 
     telemetry_cls.assert_called_once()
     telemetry.initialize.assert_called_once()
-    telemetry.send_event.assert_called_once_with("conda-install", "")
+    telemetry.send_event.assert_called_once_with("install", "")
 
 
 def test_report_error_initialize_failure_is_consumed(mocker: MockerFixture) -> None:
@@ -172,7 +172,7 @@ def test_report_error_signal_payload_baseline(
     assert attributes["parameters"] == {}
 
     mock_send_event.assert_called_once_with(
-        event_name="conda-install", body="", attributes={}
+        event_name="install", body="", attributes={}
     )
 
 
@@ -194,4 +194,4 @@ def test_report_error_send_event_failure_is_consumed(mocker: MockerFixture) -> N
     event = SimpleNamespace(exc_type=PackagesNotFoundError)
     report_error(event)  # must not raise
 
-    telemetry.send_event.assert_called_once_with("conda-install", "")
+    telemetry.send_event.assert_called_once_with("install", "")
