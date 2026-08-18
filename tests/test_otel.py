@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
-import os
-
 import anaconda_opentelemetry.signals as sig
 import pytest
 
@@ -20,13 +18,11 @@ from conda_anaconda_telemetry.otel import AnacondaTelemetry
         ("", "https://public.telemetry.anaconda.com/v1/logs"),
     ],
 )
-def test_anaconda_telemetry(environment: str, default_endpoint: str) -> None:
-    # Save original environment for reset after test run
-    orig_environment = os.getenv("ATEL_ENVIRONMENT")
-    assert orig_environment in ("test", "development")
-
-    # Set environment for test run
-    os.environ["ATEL_ENVIRONMENT"] = environment
+def test_anaconda_telemetry(
+    monkeypatch: pytest.MonkeyPatch, environment: str, default_endpoint: str
+) -> None:
+    monkeypatch.setenv("ATEL_ENVIRONMENT", environment)
+    monkeypatch.setattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED", False)
 
     telemetry = AnacondaTelemetry()
     # Confirm telemetry was configured correctly but not initialized
@@ -42,6 +38,12 @@ def test_anaconda_telemetry(environment: str, default_endpoint: str) -> None:
     # Confirm telemetry initialized successfully
     assert getattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED") is True
 
-    # Reset environment and telemetry state after test run
-    os.environ["ATEL_ENVIRONMENT"] = orig_environment
-    setattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED", False)
+
+def test_anaconda_telemetry_invalid_scheme(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An endpoint with an unsupported scheme raises instead of silently
+    accepting a broken default_endpoint.
+    """
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", "ftp://example.com")
+
+    with pytest.raises(ValueError, match=r"^A valid default endpoint must be set\.$"):
+        AnacondaTelemetry()
