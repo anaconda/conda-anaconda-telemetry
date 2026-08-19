@@ -37,7 +37,6 @@ test:
   imports:
     - conda_anaconda_telemetry
     - conda_anaconda_telemetry.hooks
-    - conda_anaconda_telemetry.plugin
 
 about:
   home: https://github.com/anaconda/{{ name }}
