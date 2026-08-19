@@ -20,6 +20,7 @@ We currently collect the following information when this plugin is installed:
 - When `conda install` or `conda create` is run, we track the packages that are being installed that are
   specified at the command line (e.g. for the command `conda install package-a package-b`, `package-a` and
   `package-b` will be tracked)
+- When `conda export` is run, we track the export arguments (e.g. `from-history`, `no-builds`) and the exporter name (e.g. `yaml`)
 
 ## Which commands are you tracking?
 
@@ -31,6 +32,7 @@ We only track commands that make network requests. This includes the following:
 - `conda create`
 - `conda remove`
 - `conda notices`
+- `conda export`
 
 ## When are telemetry headers attached?
 
