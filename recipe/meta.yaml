@@ -24,7 +24,9 @@ requirements:
     - hatch-vcs >=0.2.0
   run:
     - python >=3.10
-    - conda >=24.11
+    - conda >=26.5
+    # require at least 1.2.2 for hashes hostnames
+    - anaconda-opentelemetry >=1.2.2
 
 test:
   requires:
