@@ -20,6 +20,7 @@ We currently collect the following information when this plugin is installed:
 - When `conda install` or `conda create` is run, we track the packages that are being installed that are
   specified at the command line (e.g. for the command `conda install package-a package-b`, `package-a` and
   `package-b` will be tracked)
+- Anonymized usage tokens provided by `anaconda-anon-usage` (e.g. a client token and a per-session token)
 
 ## Which commands are you tracking?
 
