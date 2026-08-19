@@ -41,45 +41,6 @@ def get_installer_attributes() -> dict[str, str]:
     return {f"installer.{field}": data[field] for field in INSTALLER_INFO_FIELDS}
 
 
-def get_conda_version() -> str:
-    """Return the running conda's version."""
-    return conda_version
-
-
-def get_python_version() -> str:
-    """Return the running Python interpreter's version."""
-    return platform.python_version()
-
-
-def get_solver() -> str:
-    """Return the configured solver backend name."""
-    return context.solver
-
-
-def get_environment_name() -> str:
-    """Return the short name of the active (or root) environment."""
-    # TODO: env_name() falls back to returning the full prefix path when the
-    # env isn't under envs_dirs. Is that okay to
-    # send as telemetry, or do we need to handle that case differently?
-    return env_name(context.active_prefix or context.root_prefix)
-
-
-def get_ci_detected() -> bool:
-    """Return whether the ``CI`` environment variable is set."""
-    # TODO: Is there any other way we want to detect this?
-    return bool(os.environ.get("CI"))
-
-
-def get_plugin_settings() -> dict[str, object]:
-    """Return the current value of every registered plugin setting.
-
-    This is the ``plugins:`` key from .condarc - plugin-specific settings
-    (most commonly used to disable a plugin), not a list of plugin names.
-    """
-    plugins = context.plugins
-    return {name: getattr(plugins, name) for name in plugins.parameter_names}
-
-
 def get_conda_attributes() -> dict[str, str]:
     """Gather all ``conda.*`` resource attributes.
 
@@ -89,11 +50,18 @@ def get_conda_attributes() -> dict[str, str]:
     signal as Python's ``repr()`` (single-quoted dicts), which isn't
     valid JSON.
     """
+    plugins = context.plugins
+    plugin_settings = {name: getattr(plugins, name) for name in plugins.parameter_names}
+    # TODO: env_name() falls back to returning the full prefix path when the
+    # env isn't under envs_dirs. Is that okay to
+    # send as telemetry, or do we need to handle that case differently?
     return {
-        "conda.version": get_conda_version(),
-        "conda.python_version": get_python_version(),
-        "conda.solver": get_solver(),
-        "conda.environment_name": get_environment_name(),
-        "conda.ci_detected": json.dumps(get_ci_detected()),
-        "conda.plugins": json.dumps(get_plugin_settings()),
+        "conda.version": conda_version,
+        "conda.python_version": platform.python_version(),
+        "conda.solver": context.solver,
+        "conda.environment_name": env_name(
+            context.active_prefix or context.root_prefix
+        ),
+        "conda.ci_detected": json.dumps(bool(os.environ.get("CI"))),
+        "conda.plugins": json.dumps(plugin_settings),
     }

@@ -187,6 +187,9 @@ def test_report_error_signal_payload_baseline(
     event = SimpleNamespace(exc_type=PackagesNotFoundError)
     report_error(event)
 
+    mock_initialize.assert_called_once()
+    assert mock_initialize.call_args.kwargs["signal_types"] == ["logging"]
+
     resource_attributes = mock_initialize.call_args.kwargs["attributes"]
     attributes = resource_attributes._get_attributes()
     parameters = attributes["parameters"]
