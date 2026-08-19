@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
+import json
 import sys
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -17,6 +18,8 @@ from conda_anaconda_telemetry.hooks import conda_exception_observers
 from conda_anaconda_telemetry.plugin import report_error
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from conda.plugins.manager import CondaPluginManager as CondaPluginManagerType
     from pytest_mock import MockerFixture
 
@@ -143,6 +146,7 @@ def test_report_error_initialize_failure_is_consumed(mocker: MockerFixture) -> N
 
 
 def test_report_error_signal_payload_baseline(
+    tmp_path: Path,
     mocker: MockerFixture,
 ) -> None:
     """Checks what's actually in the signal payload today.
@@ -151,6 +155,22 @@ def test_report_error_signal_payload_baseline(
     AnacondaTelemetry code. Update this test as attributes are added, changed,
     or removed, so a missing/renamed field fails here.
     """
+    installer_info = {
+        "name": "TestInstaller",
+        "version": "1.0.0",
+        "platform": "linux-64",
+        "type": "sh",
+    }
+    (tmp_path / ".installer.info").write_text(json.dumps(installer_info))
+    mocker.patch(
+        "conda_anaconda_telemetry.resource_attributes.context",
+        mocker.MagicMock(
+            root_prefix=str(tmp_path),
+            solver=mocker.MagicMock(),
+            active_prefix=None,
+            plugins=mocker.MagicMock(),
+        ),
+    )
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
@@ -170,9 +190,6 @@ def test_report_error_signal_payload_baseline(
     attributes = resource_attributes._get_attributes()
     parameters = attributes["parameters"]
 
-    # installer.* is intentionally excluded here since it depends on a
-    # .installer.info file that isn't present in this test environment; it's
-    # covered separately in tests/test_resource_attributes.py.
     assert set(parameters) == {
         "conda.version",
         "conda.python_version",
@@ -180,8 +197,13 @@ def test_report_error_signal_payload_baseline(
         "conda.environment_name",
         "conda.ci_detected",
         "conda.plugins",
+        "installer.name",
+        "installer.version",
+        "installer.platform",
+        "installer.type",
     }
     assert parameters["conda.version"] == conda.__version__
+    assert parameters["installer.name"] == "TestInstaller"
 
     mock_send_event.assert_called_once_with(
         event_name="install.error", body="", attributes={}
