@@ -290,10 +290,10 @@ def conda_settings() -> Iterator[CondaSetting]:
         parameter=PrimitiveParameter(True, element_type=bool),
     )
 
-@plugins.hookimpl
+@hookimpl
 def conda_exception_observers() -> Generator[CondaExceptionObserver, None, None]:
     """Register report_error() function as a conda exception observers hook."""
-    yield plugins.types.CondaExceptionObserver(
+    yield CondaExceptionObserver(
         name="conda-anaconda-telemetry",
         hook=report_error,
         watch_for={"PackagesNotFoundError"},
