@@ -169,7 +169,7 @@ def test_report_error_signal_payload_baseline(
             root_prefix=str(tmp_path),
             solver=mocker.MagicMock(),
             active_prefix=None,
-            plugins=mocker.MagicMock(),
+            plugins=SimpleNamespace(anaconda_telemetry=True),
         ),
     )
     mocker.patch(
@@ -198,7 +198,7 @@ def test_report_error_signal_payload_baseline(
         "conda.version",
         "conda.python_version",
         "conda.solver",
-        "conda.environment_name",
+        "conda.environment_kind",
         "conda.ci_detected",
         "conda.plugins",
         "installer.name",

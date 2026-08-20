@@ -11,9 +11,19 @@ from pathlib import Path
 
 from conda import __version__ as conda_version
 from conda.base.context import context, env_name
+from conda.common.path import paths_equal
 
 #: Required fields in ``.installer.info``, as written by constructor
 INSTALLER_INFO_FIELDS = ("name", "version", "platform", "type")
+
+ALLOWED_PLUGIN_SETTINGS = ("anaconda_telemetry", "anaconda_channel_guide")
+
+
+def to_environment_kind(prefix: str) -> str:
+    """Classify a prefix without exposing its (possibly identifying) name."""
+    if paths_equal(prefix, context.root_prefix):
+        return "base"
+    return "named" if env_name(prefix) != prefix else "prefix"
 
 
 def get_installer_attributes() -> dict[str, str]:
@@ -51,15 +61,16 @@ def get_conda_attributes() -> dict[str, str]:
     valid JSON.
     """
     plugins = context.plugins
-    plugin_settings = {name: getattr(plugins, name) for name in plugins.parameter_names}
-    # TODO: env_name() falls back to returning the full prefix path when the
-    # env isn't under envs_dirs. Is that okay to
-    # send as telemetry, or do we need to handle that case differently?
+    plugin_settings = {
+        name: getattr(plugins, name)
+        for name in ALLOWED_PLUGIN_SETTINGS
+        if hasattr(plugins, name)
+    }
     return {
         "conda.version": conda_version,
         "conda.python_version": platform.python_version(),
         "conda.solver": context.solver,
-        "conda.environment_name": env_name(
+        "conda.environment_kind": to_environment_kind(
             context.active_prefix or context.root_prefix
         ),
         "conda.ci_detected": json.dumps(bool(os.environ.get("CI"))),

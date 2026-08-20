@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -10,6 +11,7 @@ import pytest
 from conda_anaconda_telemetry.resource_attributes import (
     get_conda_attributes,
     get_installer_attributes,
+    to_environment_kind,
 )
 
 if TYPE_CHECKING:
@@ -63,10 +65,42 @@ def test_get_installer_attributes(
     assert get_installer_attributes() == expected
 
 
+@pytest.mark.parametrize(
+    "prefix,root_prefix,env_name_return,expected",
+    [
+        ("/opt/conda", "/opt/conda", "base", "base"),  # root prefix itself
+        ("/opt/conda/envs/myenv", "/opt/conda", "myenv", "named"),  # under envs_dirs
+        (
+            "/some/random/path",
+            "/opt/conda",
+            "/some/random/path",  # env_name() falls back to the raw prefix
+            "prefix",
+        ),
+    ],
+)
+def test_to_environment_kind(
+    mocker: MockerFixture,
+    prefix: str,
+    root_prefix: str,
+    env_name_return: str,
+    expected: str,
+) -> None:
+    """Verify base/named/prefix are detected correctly."""
+    mocker.patch(
+        "conda_anaconda_telemetry.resource_attributes.context",
+        mocker.MagicMock(root_prefix=root_prefix),
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.resource_attributes.env_name",
+        return_value=env_name_return,
+    )
+
+    assert to_environment_kind(prefix) == expected
+
+
 def test_get_conda_attributes(monkeypatch: MonkeyPatch, mocker: MockerFixture) -> None:
     """All six conda.* keys are assembled with the expected values."""
-    mock_plugins = mocker.MagicMock(parameter_names=("my_plugin",))
-    mock_plugins.my_plugin = False
+    mock_plugins = SimpleNamespace(anaconda_telemetry=False)
     mocker.patch(
         "conda_anaconda_telemetry.resource_attributes.context",
         mocker.MagicMock(
@@ -81,8 +115,8 @@ def test_get_conda_attributes(monkeypatch: MonkeyPatch, mocker: MockerFixture) -
         return_value="3.11.15",
     )
     mocker.patch(
-        "conda_anaconda_telemetry.resource_attributes.env_name",
-        return_value="myenv",
+        "conda_anaconda_telemetry.resource_attributes.to_environment_kind",
+        return_value="named",
     )
     monkeypatch.setenv("CI", "true")
 
@@ -90,9 +124,9 @@ def test_get_conda_attributes(monkeypatch: MonkeyPatch, mocker: MockerFixture) -
         "conda.version": "26.5",
         "conda.python_version": "3.11.15",
         "conda.solver": "asolver",
-        "conda.environment_name": "myenv",
+        "conda.environment_kind": "named",
         "conda.ci_detected": "true",
-        "conda.plugins": '{"my_plugin": false}',
+        "conda.plugins": '{"anaconda_telemetry": false}',
     }
 
 
@@ -100,7 +134,7 @@ def test_get_conda_attributes_no_ci(
     monkeypatch: MonkeyPatch, mocker: MockerFixture
 ) -> None:
     """ci_detected is false when the CI env var is absent."""
-    mock_plugins = mocker.MagicMock(parameter_names=())
+    mock_plugins = SimpleNamespace()
     mocker.patch(
         "conda_anaconda_telemetry.resource_attributes.context",
         mocker.MagicMock(
@@ -116,10 +150,11 @@ def test_get_conda_attributes_no_ci(
         return_value="3.11.15",
     )
     mocker.patch(
-        "conda_anaconda_telemetry.resource_attributes.env_name",
+        "conda_anaconda_telemetry.resource_attributes.to_environment_kind",
         return_value="base",
     )
     monkeypatch.delenv("CI", raising=False)
 
     result = get_conda_attributes()
     assert result["conda.ci_detected"] == "false"
+    assert result["conda.plugins"] == "{}"
