@@ -7,17 +7,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from conda import plugins
 from conda.base.context import context
 
 from conda_anaconda_telemetry.otel import AnacondaTelemetry
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
 
     from conda.plugins.types import (
         CondaExceptionEvent,
-        CondaExceptionObserver,
     )
 
 logger = logging.getLogger(__name__)
@@ -45,13 +42,3 @@ def report_error(event: CondaExceptionEvent) -> None:
             telemetry.send_event(event_name, "")
         except Exception as e:
             logger.debug("Failed to send telemetry for %s", event.exc_type, exc_info=e)
-
-
-@plugins.hookimpl
-def conda_exception_observers() -> Generator[CondaExceptionObserver, None, None]:
-    """Register report_error() function as a conda exception observers hook."""
-    yield plugins.types.CondaExceptionObserver(
-        name="conda-anaconda-telemetry",
-        hook=report_error,
-        watch_for={"PackagesNotFoundError"},
-    )
