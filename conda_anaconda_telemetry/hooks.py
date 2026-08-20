@@ -10,7 +10,7 @@ import re
 import time
 import typing
 
-from conda import plugins
+from conda.plugins.types import CondaExceptionObserver
 from conda.base.context import context
 from conda.cli.main_list import list_packages
 from conda.common.configuration import PrimitiveParameter
@@ -27,7 +27,6 @@ except ImportError:
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator, Sequence, Generator
     from typing import Callable
-    from conda.plugins.types import CondaExceptionObserver
 
 logger = logging.getLogger(__name__)
 
