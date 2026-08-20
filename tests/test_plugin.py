@@ -2,10 +2,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
+import json
 import sys
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
+import conda
 import pytest
 from conda.exceptions import PackagesNotFoundError
 from conda.plugins.hookspec import CondaSpecs
@@ -16,6 +18,8 @@ import conda_anaconda_telemetry.plugin as plugin_module
 from conda_anaconda_telemetry.plugin import conda_exception_observers, report_error
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from conda.plugins.manager import CondaPluginManager as CondaPluginManagerType
     from pytest_mock import MockerFixture
 
@@ -143,15 +147,31 @@ def test_report_error_initialize_failure_is_consumed(mocker: MockerFixture) -> N
 
 
 def test_report_error_signal_payload_baseline(
+    tmp_path: Path,
     mocker: MockerFixture,
 ) -> None:
     """Checks what's actually in the signal payload today.
 
     Only the anaconda_opentelemetry boundary is mocked, so this uses the real
-    AnacondaTelemetry code. Both attribute dicts are empty right now since no
-    resource or event attributes have been added yet. Update this test as
-    those get added, so a missing field fails here.
+    AnacondaTelemetry code. Update this test as attributes are added, changed,
+    or removed, so a missing/renamed field fails here.
     """
+    installer_info = {
+        "name": "TestInstaller",
+        "version": "1.0.0",
+        "platform": "linux-64",
+        "type": "sh",
+    }
+    (tmp_path / ".installer.info").write_text(json.dumps(installer_info))
+    mocker.patch(
+        "conda_anaconda_telemetry.resource_attributes.context",
+        mocker.MagicMock(
+            root_prefix=str(tmp_path),
+            solver=mocker.MagicMock(),
+            active_prefix=None,
+            plugins=SimpleNamespace(anaconda_telemetry=True),
+        ),
+    )
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
@@ -167,9 +187,27 @@ def test_report_error_signal_payload_baseline(
     event = SimpleNamespace(exc_type=PackagesNotFoundError)
     report_error(event)
 
+    mock_initialize.assert_called_once()
+    assert mock_initialize.call_args.kwargs["signal_types"] == ["logging"]
+
     resource_attributes = mock_initialize.call_args.kwargs["attributes"]
     attributes = resource_attributes._get_attributes()
-    assert attributes["parameters"] == {}
+    parameters = attributes["parameters"]
+
+    assert set(parameters) == {
+        "conda.version",
+        "conda.python_version",
+        "conda.solver",
+        "conda.environment_kind",
+        "conda.ci_detected",
+        "conda.plugins",
+        "installer.name",
+        "installer.version",
+        "installer.platform",
+        "installer.type",
+    }
+    assert parameters["conda.version"] == conda.__version__
+    assert parameters["installer.name"] == "TestInstaller"
 
     mock_send_event.assert_called_once_with(
         event_name="install.error", body="", attributes={}
