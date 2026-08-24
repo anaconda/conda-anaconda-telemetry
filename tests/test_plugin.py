@@ -12,8 +12,8 @@ from conda.plugins.hookspec import CondaSpecs
 from conda.plugins.manager import CondaPluginManager
 
 import conda_anaconda_telemetry.hooks as hooks_module
-import conda_anaconda_telemetry.plugin as plugin_module
-from conda_anaconda_telemetry.plugin import conda_exception_observers, report_error
+from conda_anaconda_telemetry.hooks import conda_exception_observers
+from conda_anaconda_telemetry.plugin import report_error
 
 if TYPE_CHECKING:
     from conda.plugins.manager import CondaPluginManager as CondaPluginManagerType
@@ -31,7 +31,6 @@ def plugin_manager(mocker: MockerFixture) -> CondaPluginManagerType:
     """
     pm = CondaPluginManager()
     pm.add_hookspecs(CondaSpecs)
-    pm.register(plugin_module)
     # context.plugins.anaconda_telemetry comes from hooks.py, so it must be
     # registered too, otherwise that setting won't exist here.
     pm.register(hooks_module)
