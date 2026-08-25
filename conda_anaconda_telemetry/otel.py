@@ -16,6 +16,10 @@ from anaconda_opentelemetry.attributes import ResourceAttributes
 from anaconda_opentelemetry.config import Configuration
 
 from conda_anaconda_telemetry import APP_NAME, APP_VERSION
+from conda_anaconda_telemetry.resource_attributes import (
+    get_conda_attributes,
+    get_installer_attributes,
+)
 
 if TYPE_CHECKING:
     from typing import Any
@@ -81,6 +85,8 @@ class AnacondaTelemetry:
         attributes.set_attributes(
             platform=self.platform,
             environment=self.environment.value,
+            **get_installer_attributes(),
+            **get_conda_attributes(),
         )
         return attributes
 
