@@ -205,6 +205,8 @@ def test_report_error_signal_payload_baseline(
         "installer.platform",
         "installer.type",
     }
+    # Only spot-checking two values here; the other attributes are already
+    # covered by resource_attributes.py's own tests.
     assert parameters["conda.version"] == conda.__version__
     assert parameters["installer.name"] == "TestInstaller"
 

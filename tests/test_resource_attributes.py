@@ -30,10 +30,7 @@ INSTALLER_INFO = {
 
 #: Expected result of gathering ``INSTALLER_INFO``
 INSTALLER_ATTRIBUTES = {
-    "installer.name": "Foo",
-    "installer.version": "1.2.3",
-    "installer.platform": "linux-64",
-    "installer.type": "sh",
+    f"installer.{key}": value for key, value in INSTALLER_INFO.items()
 }
 
 
@@ -134,24 +131,13 @@ def test_get_conda_attributes_no_ci(
     monkeypatch: MonkeyPatch, mocker: MockerFixture
 ) -> None:
     """ci_detected is false when the CI env var is absent."""
-    mock_plugins = SimpleNamespace()
     mocker.patch(
         "conda_anaconda_telemetry.resource_attributes.context",
         mocker.MagicMock(
-            solver="classic",
             active_prefix=None,
             root_prefix="/root",
-            plugins=mock_plugins,
+            plugins=SimpleNamespace(),
         ),
-    )
-    mocker.patch("conda_anaconda_telemetry.resource_attributes.conda_version", "26.5")
-    mocker.patch(
-        "conda_anaconda_telemetry.resource_attributes.platform.python_version",
-        return_value="3.11.15",
-    )
-    mocker.patch(
-        "conda_anaconda_telemetry.resource_attributes.to_environment_kind",
-        return_value="base",
     )
     monkeypatch.delenv("CI", raising=False)
 

@@ -10,13 +10,14 @@ import re
 import time
 import typing
 
-from conda.plugins.types import CondaExceptionObserver
 from conda.base.context import context
 from conda.cli.main_list import list_packages
 from conda.common.configuration import PrimitiveParameter
 from conda.common.url import mask_anaconda_token
 from conda.models.channel import all_channel_urls
 from conda.plugins import CondaRequestHeader, CondaSetting, hookimpl
+from conda.plugins.types import CondaExceptionObserver
+
 from conda_anaconda_telemetry.plugin import report_error
 
 try:
@@ -25,7 +26,7 @@ except ImportError:
     conda_build_version = "n/a"
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence, Generator
+    from collections.abc import Generator, Iterator, Sequence
     from typing import Callable
 
 logger = logging.getLogger(__name__)
@@ -289,6 +290,7 @@ def conda_settings() -> Iterator[CondaSetting]:
         description="Whether Anaconda Telemetry is enabled",
         parameter=PrimitiveParameter(True, element_type=bool),
     )
+
 
 @hookimpl
 def conda_exception_observers() -> Generator[CondaExceptionObserver, None, None]:

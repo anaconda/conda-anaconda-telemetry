@@ -10,6 +10,7 @@ import platform
 from pathlib import Path
 
 from conda import __version__ as conda_version
+from conda.auxlib.type_coercion import boolify
 from conda.base.context import context, env_name
 from conda.common.path import paths_equal
 
@@ -62,7 +63,7 @@ def get_conda_attributes() -> dict[str, str]:
     """
     plugins = context.plugins
     plugin_settings = {
-        name: getattr(plugins, name)
+        name: bool(getattr(plugins, name))
         for name in ALLOWED_PLUGIN_SETTINGS
         if hasattr(plugins, name)
     }
@@ -73,6 +74,6 @@ def get_conda_attributes() -> dict[str, str]:
         "conda.environment_kind": to_environment_kind(
             context.active_prefix or context.root_prefix
         ),
-        "conda.ci_detected": json.dumps(bool(os.environ.get("CI"))),
+        "conda.ci_detected": json.dumps(boolify(os.environ.get("CI", ""))),
         "conda.plugins": json.dumps(plugin_settings),
     }
