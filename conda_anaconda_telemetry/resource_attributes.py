@@ -17,7 +17,7 @@ from conda.common.path import paths_equal
 #: Required fields in ``.installer.info``, as written by constructor
 INSTALLER_INFO_FIELDS = ("name", "version", "platform", "type")
 
-ALLOWED_PLUGIN_SETTINGS = ("anaconda_channel_guide",)
+ALLOWED_PLUGIN_SETTINGS = ("anaconda_channel_guide", "anaconda_anon_usage")
 
 
 def to_environment_kind(prefix: str) -> str:
@@ -62,11 +62,14 @@ def get_conda_attributes() -> dict[str, str]:
     valid JSON.
     """
     plugins = context.plugins
-    plugin_settings = {
-        name: bool(getattr(plugins, name))
-        for name in ALLOWED_PLUGIN_SETTINGS
-        if hasattr(plugins, name)
-    }
+    plugin_settings = {}
+    for name in ALLOWED_PLUGIN_SETTINGS:
+        # Most settings are registered by plugins under context.plugins, but
+        # anaconda_anon_usage is patched directly onto Context itself.
+        if hasattr(plugins, name):
+            plugin_settings[name] = bool(getattr(plugins, name))
+        elif hasattr(context, name):
+            plugin_settings[name] = bool(getattr(context, name))
     return {
         "conda.version": conda_version,
         "conda.python_version": platform.python_version(),

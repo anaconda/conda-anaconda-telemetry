@@ -96,16 +96,22 @@ def test_to_environment_kind(
 
 
 def test_get_conda_attributes(monkeypatch: MonkeyPatch, mocker: MockerFixture) -> None:
-    """All six conda.* keys are assembled with the expected values."""
+    """All six conda.* keys are assembled with the expected values.
+
+    anaconda_anon_usage isn't on context.plugins - it's patched directly onto
+    Context - so this also covers get_conda_attributes()'s fallback to
+    reading it straight off ``context``.
+    """
     mock_plugins = SimpleNamespace(anaconda_channel_guide=False)
-    mocker.patch(
-        "conda_anaconda_telemetry.resource_attributes.context",
-        mocker.MagicMock(
-            solver="asolver",
-            active_prefix="/envs/myenv",
-            plugins=mock_plugins,
-        ),
+    # Plain object, not MagicMock, so hasattr(context, ...) below only
+    # succeeds for attributes we actually set.
+    mock_context = SimpleNamespace(
+        solver="asolver",
+        active_prefix="/envs/myenv",
+        plugins=mock_plugins,
+        anaconda_anon_usage=True,
     )
+    mocker.patch("conda_anaconda_telemetry.resource_attributes.context", mock_context)
     mocker.patch("conda_anaconda_telemetry.resource_attributes.conda_version", "26.5")
     mocker.patch(
         "conda_anaconda_telemetry.resource_attributes.platform.python_version",
@@ -123,7 +129,9 @@ def test_get_conda_attributes(monkeypatch: MonkeyPatch, mocker: MockerFixture) -
         "conda.solver": "asolver",
         "conda.environment_kind": "named",
         "conda.ci_detected": "true",
-        "conda.plugins": '{"anaconda_channel_guide": false}',
+        "conda.plugins": (
+            '{"anaconda_channel_guide": false, "anaconda_anon_usage": true}'
+        ),
     }
 
 
@@ -133,7 +141,8 @@ def test_get_conda_attributes_no_ci(
     """ci_detected is false when the CI env var is absent."""
     mocker.patch(
         "conda_anaconda_telemetry.resource_attributes.context",
-        mocker.MagicMock(
+        SimpleNamespace(
+            solver="asolver",
             active_prefix=None,
             root_prefix="/root",
             plugins=SimpleNamespace(),
