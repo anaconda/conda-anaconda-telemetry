@@ -97,7 +97,7 @@ def test_to_environment_kind(
 
 def test_get_conda_attributes(monkeypatch: MonkeyPatch, mocker: MockerFixture) -> None:
     """All six conda.* keys are assembled with the expected values."""
-    mock_plugins = SimpleNamespace(anaconda_telemetry=False)
+    mock_plugins = SimpleNamespace(anaconda_channel_guide=False)
     mocker.patch(
         "conda_anaconda_telemetry.resource_attributes.context",
         mocker.MagicMock(
@@ -123,7 +123,7 @@ def test_get_conda_attributes(monkeypatch: MonkeyPatch, mocker: MockerFixture) -
         "conda.solver": "asolver",
         "conda.environment_kind": "named",
         "conda.ci_detected": "true",
-        "conda.plugins": '{"anaconda_telemetry": false}',
+        "conda.plugins": '{"anaconda_channel_guide": false}',
     }
 
 

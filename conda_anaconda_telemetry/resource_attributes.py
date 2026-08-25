@@ -17,7 +17,7 @@ from conda.common.path import paths_equal
 #: Required fields in ``.installer.info``, as written by constructor
 INSTALLER_INFO_FIELDS = ("name", "version", "platform", "type")
 
-ALLOWED_PLUGIN_SETTINGS = ("anaconda_telemetry", "anaconda_channel_guide")
+ALLOWED_PLUGIN_SETTINGS = ("anaconda_channel_guide",)
 
 
 def to_environment_kind(prefix: str) -> str:
