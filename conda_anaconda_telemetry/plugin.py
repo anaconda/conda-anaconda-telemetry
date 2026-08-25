@@ -12,7 +12,6 @@ from conda.base.context import context
 from conda_anaconda_telemetry.otel import AnacondaTelemetry
 
 if TYPE_CHECKING:
-
     from conda.plugins.types import (
         CondaExceptionEvent,
     )
