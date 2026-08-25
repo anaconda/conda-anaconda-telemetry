@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Anaconda, Inc
+# Copyright (C) 2024-2026 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
 """Conda plugin that adds telemetry headers to requests made by conda."""
 
@@ -16,6 +16,9 @@ from conda.common.configuration import PrimitiveParameter
 from conda.common.url import mask_anaconda_token
 from conda.models.channel import all_channel_urls
 from conda.plugins import CondaRequestHeader, CondaSetting, hookimpl
+from conda.plugins.types import CondaExceptionObserver
+
+from conda_anaconda_telemetry.plugin import report_error
 
 try:
     from conda_build import __version__ as conda_build_version
@@ -23,7 +26,7 @@ except ImportError:
     conda_build_version = "n/a"
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Generator, Iterator, Sequence
     from typing import Callable
 
 logger = logging.getLogger(__name__)
@@ -286,4 +289,14 @@ def conda_settings() -> Iterator[CondaSetting]:
         name="anaconda_telemetry",
         description="Whether Anaconda Telemetry is enabled",
         parameter=PrimitiveParameter(True, element_type=bool),
+    )
+
+
+@hookimpl
+def conda_exception_observers() -> Generator[CondaExceptionObserver, None, None]:
+    """Register report_error() function as a conda exception observers hook."""
+    yield CondaExceptionObserver(
+        name="conda-anaconda-telemetry",
+        hook=report_error,
+        watch_for={"PackagesNotFoundError"},
     )

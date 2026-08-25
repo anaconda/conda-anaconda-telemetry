@@ -24,7 +24,9 @@ requirements:
     - hatch-vcs >=0.2.0
   run:
     - python >=3.10
-    - conda >=24.11
+    - conda >=26.5
+    # require at least 1.2.2 for hashed hostnames
+    - anaconda-opentelemetry >=1.2.2
 
 test:
   requires:
@@ -40,7 +42,7 @@ test:
 about:
   home: https://github.com/anaconda/{{ name }}
   summary: Anaconda Telemetry conda plugin
-  description: Anaconda Telemetry for conda adds helps us understand how conda is being used.
+  description: Anaconda Telemetry for conda helps us understand how conda is being used.
   license: BSD-3-Clause
   license_file: LICENSE
 
