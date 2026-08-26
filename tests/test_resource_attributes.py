@@ -11,6 +11,7 @@ import pytest
 from conda_anaconda_telemetry.resource_attributes import (
     get_conda_attributes,
     get_installer_attributes,
+    get_plugin_settings,
     to_environment_kind,
 )
 
@@ -32,6 +33,36 @@ INSTALLER_INFO = {
 INSTALLER_ATTRIBUTES = {
     f"installer.{key}": value for key, value in INSTALLER_INFO.items()
 }
+
+
+def test_get_plugin_settings(mocker: MockerFixture) -> None:
+    """Only allowlisted, actually-registered settings are returned."""
+    mocker.patch(
+        "conda_anaconda_telemetry.resource_attributes.context",
+        mocker.MagicMock(
+            plugins=SimpleNamespace(anaconda_anon_usage=True, auto_accept_tos=False)
+        ),
+    )
+
+    assert get_plugin_settings() == {
+        "anaconda_anon_usage": True,
+        "auto_accept_tos": False,
+    }
+
+
+def test_get_plugin_settings_caches_across_calls(mocker: MockerFixture) -> None:
+    """The context is only read once; later mutations aren't picked up."""
+    plugins = SimpleNamespace(anaconda_anon_usage=True)
+    mocker.patch(
+        "conda_anaconda_telemetry.resource_attributes.context",
+        mocker.MagicMock(plugins=plugins),
+    )
+
+    first = get_plugin_settings()
+    plugins.anaconda_anon_usage = False
+    second = get_plugin_settings()
+
+    assert first == second == {"anaconda_anon_usage": True}
 
 
 @pytest.mark.parametrize(

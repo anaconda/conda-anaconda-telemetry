@@ -42,6 +42,22 @@ def plugin_manager(mocker: MockerFixture) -> CondaPluginManagerType:
     return pm
 
 
+@pytest.fixture(autouse=True)
+def mock_install_attributes(mocker: MockerFixture) -> dict:
+    """Stub get_install_attributes() so tests don't depend on live conda state.
+
+    get_install_attributes()'s own field-by-field correctness is tested in
+    tests/test_otel.py; this file only needs to check that report_error()
+    calls it and forwards the result unchanged.
+    """
+    attributes = {"signal.name": "install", "exception.name": "PackagesNotFoundError"}
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.get_install_attributes",
+        return_value=attributes,
+    )
+    return attributes
+
+
 def raise_and_dispatch(
     plugin_manager: CondaPluginManagerType, exc: BaseException
 ) -> None:
@@ -97,7 +113,9 @@ def test_report_error_non_install_command(
 
 
 def test_report_error_happy_path(
-    plugin_manager: CondaPluginManagerType, mocker: MockerFixture
+    plugin_manager: CondaPluginManagerType,
+    mocker: MockerFixture,
+    mock_install_attributes: dict,
 ) -> None:
     """On install, telemetry is initialized and the event is sent."""
     mocker.patch(
@@ -116,7 +134,9 @@ def test_report_error_happy_path(
 
     telemetry_cls.assert_called_once()
     telemetry.initialize.assert_called_once()
-    telemetry.send_event.assert_called_once_with("install.error", "")
+    telemetry.send_event.assert_called_once_with(
+        "install.error", "", mock_install_attributes
+    )
 
 
 def test_report_error_initialize_failure_is_consumed(mocker: MockerFixture) -> None:
@@ -148,6 +168,7 @@ def test_report_error_initialize_failure_is_consumed(mocker: MockerFixture) -> N
 def test_report_error_signal_payload_baseline(
     tmp_path: Path,
     mocker: MockerFixture,
+    mock_install_attributes: dict,
 ) -> None:
     """Checks what's actually in the signal payload today.
 
@@ -211,11 +232,13 @@ def test_report_error_signal_payload_baseline(
     assert parameters["installer.name"] == "TestInstaller"
 
     mock_send_event.assert_called_once_with(
-        event_name="install.error", body="", attributes={}
+        event_name="install.error", body="", attributes=mock_install_attributes
     )
 
 
-def test_report_error_send_event_failure_is_consumed(mocker: MockerFixture) -> None:
+def test_report_error_send_event_failure_is_consumed(
+    mocker: MockerFixture, mock_install_attributes: dict
+) -> None:
     """If send_event() raises, the failure is consumed rather than propagating."""
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
@@ -233,4 +256,6 @@ def test_report_error_send_event_failure_is_consumed(mocker: MockerFixture) -> N
     event = SimpleNamespace(exc_type=PackagesNotFoundError)
     report_error(event)  # must not raise
 
-    telemetry.send_event.assert_called_once_with("install.error", "")
+    telemetry.send_event.assert_called_once_with(
+        "install.error", "", mock_install_attributes
+    )

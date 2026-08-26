@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import platform
@@ -17,7 +18,12 @@ from conda.common.path import paths_equal
 #: Required fields in ``.installer.info``, as written by constructor
 INSTALLER_INFO_FIELDS = ("name", "version", "platform", "type")
 
-ALLOWED_PLUGIN_SETTINGS = ("anaconda_channel_guide", "anaconda_anon_usage")
+ALLOWED_PLUGIN_SETTINGS = (
+    "anaconda_channel_guide",
+    "anaconda_anon_usage",
+    # Registered by conda-anaconda-tos
+    "auto_accept_tos",
+)
 
 
 def to_environment_kind(prefix: str) -> str:
@@ -25,6 +31,20 @@ def to_environment_kind(prefix: str) -> str:
     if paths_equal(prefix, context.root_prefix):
         return "base"
     return "named" if env_name(prefix) != prefix else "prefix"
+
+
+@functools.lru_cache(None)
+def get_plugin_settings() -> dict[str, bool]:
+    """Return allowlisted conda_settings-hook plugin values.
+
+    Cached per process since these settings don't change mid-run.
+    """
+    plugins = context.plugins
+    return {
+        name: bool(getattr(plugins, name))
+        for name in ALLOWED_PLUGIN_SETTINGS
+        if hasattr(plugins, name)
+    }
 
 
 def get_installer_attributes() -> dict[str, str]:
