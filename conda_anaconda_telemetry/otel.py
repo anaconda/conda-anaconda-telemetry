@@ -38,8 +38,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-#: Schema version for get_install_attributes()'s event attributes - bump
-#: manually whenever this dict's keys/shape change.
+#: Schema version for the created signal,
+#: bump manually whenever this contents/shape change.
 SIGNAL_VERSION = "1"
 
 
