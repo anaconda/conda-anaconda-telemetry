@@ -15,3 +15,4 @@ conda activate "$CONDA_ENV_DIR"
 pip install -e .
 
 CONDA_EXE="$CONDA_PREFIX/condabin/conda"
+export ATEL_ENVIRONMENT="development"
