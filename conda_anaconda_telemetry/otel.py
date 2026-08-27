@@ -26,6 +26,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# How long shutdown() waits for buffered telemetry to flush before giving up.
+_SHUTDOWN_TIMEOUT_SECONDS = 2.0
+
 
 class Environment(Enum):
     """Environment enum."""
@@ -79,9 +82,15 @@ class AnacondaTelemetry:
 
     def _make_config(self) -> Configuration:
         config = Configuration(default_endpoint=self.default_endpoint)
+        # Never probe connectivity before sending an event: skip this for every
+        # endpoint, not just localhost, so a slow/unreachable network can't add
+        # latency to a conda command that's just trying to report an error.
+        config.set_skip_internet_check(True)
+        # Manage shutdown ourselves (see shutdown() below) with a fixed timeout,
+        # instead of letting the SDK register its own unbounded atexit handler.
+        config.set_shutdown_on_exit(False)
         if "localhost" in self.default_endpoint.lower():
             # Set the configuration for test and development
-            config.set_skip_internet_check(True)
             config.set_console_exporter(True)
         return config
 
@@ -108,19 +117,31 @@ class AnacondaTelemetry:
     def send_event(
         self, event_name: str, body: str, attributes: dict[str, Any] | None = None
     ) -> None:
-        """Send a telemetry event."""
+        """Send a telemetry event and flush it within a fixed time budget.
+
+        This only queues the event; it is not actually sent until shutdown()
+        flushes it. Since _make_config() turns off the SDK's automatic
+        shutdown, that flush is called here so callers can't forget it.
+        """
         if attributes is None:
             attributes = {}
 
         logger.info("Sending a signal with event log data to the telemetry collector.")
 
-        result = sig.send_event(
-            event_name=event_name,
-            body=body,
-            attributes=attributes,
-        )
+        try:
+            result = sig.send_event(
+                event_name=event_name,
+                body=body,
+                attributes=attributes,
+            )
 
-        if result is True:
-            logger.info("Event log sent successfully!")
-        else:
-            logger.debug("Event log failed to send.")
+            if result is True:
+                logger.info("Event log sent successfully!")
+            else:
+                logger.debug("Event log failed to send.")
+        finally:
+            self.shutdown()
+
+    def shutdown(self) -> None:
+        """Flush and shut down telemetry within a fixed time budget."""
+        sig.shutdown_telemetry(timeout_seconds=_SHUTDOWN_TIMEOUT_SECONDS)

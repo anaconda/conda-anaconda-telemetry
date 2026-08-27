@@ -5,7 +5,10 @@ from __future__ import annotations
 import anaconda_opentelemetry.signals as sig
 import pytest
 
+from conda_anaconda_telemetry import otel
 from conda_anaconda_telemetry.otel import AnacondaTelemetry
+
+DUMMY_ENDPOINT = "http://localhost:4318"
 
 
 @pytest.mark.parametrize(
@@ -13,8 +16,8 @@ from conda_anaconda_telemetry.otel import AnacondaTelemetry
     [
         ("production", "https://public.telemetry.anaconda.com/v1/logs"),
         ("staging", "https://metrics.stage.anacondaconnect.com/v1/logs"),
-        ("test", "http://localhost:4318"),
-        ("development", "http://localhost:4318"),
+        ("test", DUMMY_ENDPOINT),
+        ("development", DUMMY_ENDPOINT),
         ("", "https://public.telemetry.anaconda.com/v1/logs"),
     ],
 )
@@ -76,21 +79,69 @@ def test_anaconda_telemetry_rejects_non_loopback_cleartext(
 
 
 @pytest.mark.parametrize(
-    "default_endpoint,expected",
+    "default_endpoint,expected_console_exporter",
     [
-        ("http://localhost:4318", True),
+        (DUMMY_ENDPOINT, True),
         ("https://public.telemetry.anaconda.com/v1/logs", False),
     ],
 )
 def test_make_config(
-    monkeypatch: pytest.MonkeyPatch, default_endpoint: str, expected: bool
+    monkeypatch: pytest.MonkeyPatch,
+    default_endpoint: str,
+    expected_console_exporter: bool,
 ) -> None:
-    """Only a localhost endpoint skips the internet check and uses the
-    console exporter.
+    """Only a localhost endpoint uses the console exporter, but every
+    endpoint skips the internet check and defers shutdown timing to us
+    (instead of an unbounded atexit handler), regardless of environment.
     """
     monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", default_endpoint)
 
     config = AnacondaTelemetry()._make_config()
 
-    assert config._get_skip_internet_check() is expected
-    assert config._get_console_exporter() is expected
+    # Never probe connectivity before sending an event, no matter the endpoint.
+    assert config._get_skip_internet_check() is True
+    # Never let the SDK register its own unbounded atexit shutdown; we call
+    # AnacondaTelemetry.shutdown() ourselves with a fixed timeout instead.
+    assert config._get_shutdown_on_exit() is False
+    assert config._get_console_exporter() is expected_console_exporter
+
+
+def test_anaconda_telemetry_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shutdown() flushes and shuts down telemetry within a fixed time budget
+    instead of relying on the SDK's own unbounded atexit handler.
+    """
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+    # Record what AnacondaTelemetry.shutdown() actually passes through to the
+    # library, rather than calling the real shutdown_telemetry().
+    recorded_kwargs = {}
+
+    def fake_shutdown_telemetry(**kwargs: float) -> None:
+        recorded_kwargs.update(kwargs)
+
+    monkeypatch.setattr(sig, "shutdown_telemetry", fake_shutdown_telemetry)
+
+    AnacondaTelemetry().shutdown()
+
+    assert recorded_kwargs == {"timeout_seconds": otel._SHUTDOWN_TIMEOUT_SECONDS}
+
+
+def test_send_event_always_shuts_down(monkeypatch: pytest.MonkeyPatch) -> None:
+    """send_event() must flush via shutdown() even when the send itself fails,
+    since nothing else is left to flush a queued event (shutdown_on_exit is
+    turned off in _make_config()).
+    """
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+
+    def mock_send_event(**_kwargs: str) -> None:
+        raise RuntimeError("fail")
+
+    monkeypatch.setattr(sig, "send_event", mock_send_event)
+    shutdown_calls = []
+    monkeypatch.setattr(
+        sig, "shutdown_telemetry", lambda **kwargs: shutdown_calls.append(kwargs)
+    )
+
+    with pytest.raises(RuntimeError, match="fail"):
+        AnacondaTelemetry().send_event("install.error", "")
+
+    assert shutdown_calls == [{"timeout_seconds": otel._SHUTDOWN_TIMEOUT_SECONDS}]
