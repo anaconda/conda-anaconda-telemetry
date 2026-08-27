@@ -13,6 +13,7 @@ import pytest
 from conda import __version__ as conda_version
 from conda.exceptions import PackagesNotFoundError
 
+from conda_anaconda_telemetry import otel
 from conda_anaconda_telemetry.otel import (
     LIST_BYTE_LIMIT,
     LIST_ITEM_LIMIT,
@@ -95,26 +96,56 @@ def test_atel_default_endpoint_falls_through_for_untrusted_values(
 
 
 @pytest.mark.parametrize(
-    "environment,expected",
-    [
-        ("", False),
-        ("test", False),
-        ("development", False),
-        ("staging", False),
-        ("production", False),
-    ],
+    "environment",
+    ["", "test", "development", "staging", "production"],
 )
-def test_make_config(
-    monkeypatch: pytest.MonkeyPatch, environment: str, expected: bool
-) -> None:
-    """Environment labels do not enable local collector settings."""
+def test_make_config(monkeypatch: pytest.MonkeyPatch, environment: str) -> None:
+    """Environment labels do not enable local collector settings. Every
+    endpoint skips the internet check and defers shutdown timing to us
+    (instead of an unbounded atexit handler), regardless of environment.
+    """
     monkeypatch.setenv("ATEL_ENVIRONMENT", environment)
     monkeypatch.delenv("ATEL_DEFAULT_ENDPOINT", raising=False)
 
     config = AnacondaTelemetry()._make_config()
 
-    assert config._get_skip_internet_check() is expected
-    assert config._get_console_exporter() is expected
+    assert config._get_skip_internet_check() is True
+    assert config._get_shutdown_on_exit() is False
+    assert config._get_console_exporter() is False
+
+
+def test_anaconda_telemetry_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Shutdown telemetry within a fixed time budget."""
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+    recorded_kwargs = {}
+
+    def fake_shutdown_telemetry(**kwargs: float) -> None:
+        recorded_kwargs.update(kwargs)
+
+    monkeypatch.setattr(sig, "shutdown_telemetry", fake_shutdown_telemetry)
+
+    AnacondaTelemetry().shutdown()
+
+    assert recorded_kwargs == {"timeout_seconds": otel._SHUTDOWN_TIMEOUT_SECONDS}
+
+
+def test_send_event_always_shuts_down(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Flush telemetry even when sending the event fails."""
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+
+    def mock_send_event(**_kwargs: str) -> None:
+        raise RuntimeError("fail")
+
+    monkeypatch.setattr(sig, "send_event", mock_send_event)
+    shutdown_calls = []
+    monkeypatch.setattr(
+        sig, "shutdown_telemetry", lambda **kwargs: shutdown_calls.append(kwargs)
+    )
+
+    with pytest.raises(RuntimeError, match="fail"):
+        AnacondaTelemetry().send_event("install.error", "")
+
+    assert shutdown_calls == [{"timeout_seconds": otel._SHUTDOWN_TIMEOUT_SECONDS}]
 
 
 def test_make_attributes_system_info() -> None:
