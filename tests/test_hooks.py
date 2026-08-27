@@ -19,6 +19,7 @@ from conda_anaconda_telemetry.hooks import (
     _conda_request_headers,
     conda_request_headers,
     conda_settings,
+    get_channel_urls,
     should_submit_request_headers,
     timer,
 )
@@ -152,6 +153,19 @@ def test_install_headers(
     assert len(header_names.intersection(expected_header_names)) == len(
         expected_header_names
     )
+
+
+def test_get_channel_urls_strips_basic_auth_credentials(mocker: MockerFixture) -> None:
+    """Channel URLs must not leak embedded HTTP Basic Auth credentials."""
+    mocker.patch(
+        "conda.base.context.Context.channels",
+        new_callable=mocker.PropertyMock,
+        return_value=("https://user:pass@private.example.com/channel",),
+    )
+
+    urls = get_channel_urls()
+
+    assert not any("user:pass" in url for url in urls)
 
 
 def test_disabled_plugin(mocker: MockerFixture) -> None:
