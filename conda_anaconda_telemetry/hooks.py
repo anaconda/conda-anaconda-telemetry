@@ -15,6 +15,7 @@ from conda.cli.main_list import list_packages
 from conda.common.configuration import PrimitiveParameter
 from conda.common.url import mask_anaconda_token
 from conda.models.channel import all_channel_urls
+from conda.models.match_spec import MatchSpec
 from conda.plugins import CondaRequestHeader, CondaSetting, hookimpl
 
 try:
@@ -81,6 +82,23 @@ REQUEST_HEADER_PATTERN = re.compile(
     re.VERBOSE,
 )
 
+#: Define a set of known channel names, anything else is considered private.
+KNOWN_PUBLIC_CHANNELS = frozenset(
+    {"anaconda", "conda-forge", "defaults", "main", "main-x", "msys2", "r"}
+)
+
+
+def _get_public_package_name(spec: str) -> str | None:
+    """Parse a raw package spec and return its name, name only, if public.
+
+    Returns ``None`` if the spec's channel is considered private.
+    """
+    match_spec = MatchSpec(spec)
+    channel = match_spec.get("channel")
+    if channel is not None and channel.canonical_name not in KNOWN_PUBLIC_CHANNELS:
+        return None
+    return match_spec.name
+
 
 def timer(func: Callable) -> Callable:
     """Log the duration of a function call."""
@@ -133,13 +151,14 @@ def get_package_list() -> tuple[str, ...]:
 
 
 def get_search_term() -> str:
-    """Retrieve the search term being used when search command is run."""
-    return context._argparse_args.match_spec
+    """Retrieve the package name being searched for, name only, if public."""
+    return _get_public_package_name(context._argparse_args.match_spec) or ""
 
 
 def get_install_arguments() -> tuple[str, ...]:
-    """Get the parsed position argument."""
-    return context._argparse_args.packages
+    """Get the parsed package names only, omitting any from a private channel."""
+    names = (_get_public_package_name(spec) for spec in context._argparse_args.packages)
+    return tuple(name for name in names if name is not None)
 
 
 @timer

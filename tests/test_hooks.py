@@ -19,6 +19,8 @@ from conda_anaconda_telemetry.hooks import (
     _conda_request_headers,
     conda_request_headers,
     conda_settings,
+    get_install_arguments,
+    get_search_term,
     should_submit_request_headers,
     timer,
 )
@@ -154,6 +156,59 @@ def test_install_headers(
     )
 
 
+@pytest.mark.parametrize(
+    "match_spec,expected",
+    [
+        (
+            "conda-forge::pkg_foo=1.2.3=py311h_0",
+            "pkg_foo",
+        ),  # strips version/build/channel
+        ("/local/path/to/pkg-1.0-0.tar.bz2", "*"),  # no raw local path leaked
+        ("somethingprivate::pkg_foo", ""),  # private channel name omitted
+    ],
+)
+def test_get_search_term_public_name_only(
+    mocker: MockerFixture, match_spec: str, expected: str
+) -> None:
+    """
+    Ensure the search header contains only the public package name
+    """
+    mock_argparse_args = mocker.MagicMock(match_spec=match_spec)
+    mocker.patch(
+        "conda_anaconda_telemetry.hooks.context._argparse_args", mock_argparse_args
+    )
+
+    assert get_search_term() == expected
+
+
+@pytest.mark.parametrize(
+    "packages,expected",
+    [
+        (  # strips version/build/channel
+            ["defaults::pkg_bar", "conda-forge::pkg_foo=1.2.3=py311h_0"],
+            ("pkg_bar", "pkg_foo"),
+        ),
+        (["/local/path/to/pkg-1.0-0.tar.bz2"], ("*",)),  # no raw local path leaked
+        (  # private channel name omitted, public ones kept
+            ["defaults::pkg_bar", "somethingprivate::pkg_foo"],
+            ("pkg_bar",),
+        ),
+    ],
+)
+def test_get_install_arguments_public_names_only(
+    mocker: MockerFixture, packages: list[str], expected: tuple[str, ...]
+) -> None:
+    """
+    Ensure the install header contains only public package names
+    """
+    mock_argparse_args = mocker.MagicMock(packages=packages)
+    mocker.patch(
+        "conda_anaconda_telemetry.hooks.context._argparse_args", mock_argparse_args
+    )
+
+    assert get_install_arguments() == expected
+
+
 def test_disabled_plugin(mocker: MockerFixture) -> None:
     """
     Make sure that nothing is returned when the plugin is disabled via settings
@@ -227,7 +282,7 @@ def test_conda_request_headers_with_non_matching_url() -> None:
         ),
         (
             ["conda", "search", "package"],
-            MagicMock(match_spec=["package"], cmd="search"),
+            MagicMock(match_spec="package", cmd="search"),
         ),
         (["conda", "update", "package"], MagicMock(packages=["package"], cmd="update")),
     ),
