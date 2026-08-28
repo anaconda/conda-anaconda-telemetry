@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import logging
 import os
-import shlex
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -21,7 +20,6 @@ from conda_anaconda_telemetry import APP_NAME, APP_VERSION
 from conda_anaconda_telemetry.resource_attributes import (
     get_conda_attributes,
     get_installer_attributes,
-    get_plugin_settings,
 )
 
 try:
@@ -157,19 +155,12 @@ def tos_are_accepted(channel: str) -> bool | None:
         return None
 
 
-def get_install_attributes(
-    event: CondaExceptionEvent, argv: tuple[str, ...] | None = None
-) -> dict[str, Any]:
+def get_install_attributes(event: CondaExceptionEvent) -> dict[str, Any]:
     """Gather event attributes for the install-command PackagesNotFoundError signal."""
     argparse_args = context._argparse_args
-    # event.argv is frozen at exception time; safer than live sys.argv here.
-    raw_argv = argv if argv is not None else event.argv
-    # raw_argv[1:] drops the leading conda executable path, keeping just the
-    # subcommand and its flags.
     return {
         "signal.name": argparse_args.cmd,
         "signal.version": SIGNAL_VERSION,
-        "conda.raw_command": shlex.join(raw_argv[1:]) if raw_argv else "",
         # context.channels is the fully merged channel list (CLI + condarc +
         # defaults); contrast with install.overrides below.
         "install.condarc.channels": [
@@ -178,13 +169,6 @@ def get_install_attributes(
         ],
         "install.condarc.channel_priority": str(context.channel_priority),
         "install.override_channels": bool(argparse_args.override_channels),
-        # argparse_args.channel_priority is the raw --channel-priority flag on
-        # this invocation, distinct from the merged context.channel_priority above.
-        "install.strict_channel_priority": argparse_args.channel_priority == "strict",
-        "install.no_channel_priority": argparse_args.channel_priority == "disabled",
-        "install.use_local": bool(argparse_args.use_local),
-        "install.auto_accept": get_plugin_settings().get("auto_accept_tos", False),
-        "install.dry_run": bool(argparse_args.dry_run),
         # This invocation's -c/--channel overrides, not the merged channel list.
         "install.overrides": list(argparse_args.channel or []),
         "install.packages": list(argparse_args.packages or []),

@@ -11,7 +11,6 @@ import pytest
 from conda_anaconda_telemetry.resource_attributes import (
     get_conda_attributes,
     get_installer_attributes,
-    get_plugin_settings,
     to_environment_kind,
 )
 
@@ -33,36 +32,6 @@ INSTALLER_INFO = {
 INSTALLER_ATTRIBUTES = {
     f"installer.{key}": value for key, value in INSTALLER_INFO.items()
 }
-
-
-def test_get_plugin_settings(mocker: MockerFixture) -> None:
-    """Only allowlisted, actually-registered settings are returned."""
-    mocker.patch(
-        "conda_anaconda_telemetry.resource_attributes.context",
-        mocker.MagicMock(
-            plugins=SimpleNamespace(anaconda_anon_usage=True, auto_accept_tos=False)
-        ),
-    )
-
-    assert get_plugin_settings() == {
-        "anaconda_anon_usage": True,
-        "auto_accept_tos": False,
-    }
-
-
-def test_get_plugin_settings_caches_across_calls(mocker: MockerFixture) -> None:
-    """The context is only read once; later mutations aren't picked up."""
-    plugins = SimpleNamespace(anaconda_anon_usage=True)
-    mocker.patch(
-        "conda_anaconda_telemetry.resource_attributes.context",
-        mocker.MagicMock(plugins=plugins),
-    )
-
-    first = get_plugin_settings()
-    plugins.anaconda_anon_usage = False
-    second = get_plugin_settings()
-
-    assert first == second == {"anaconda_anon_usage": True}
 
 
 @pytest.mark.parametrize(
@@ -127,20 +96,10 @@ def test_to_environment_kind(
 
 
 def test_get_conda_attributes(monkeypatch: MonkeyPatch, mocker: MockerFixture) -> None:
-    """All six conda.* keys are assembled with the expected values.
-
-    anaconda_anon_usage isn't on context.plugins - it's patched directly onto
-    Context - so this also covers get_conda_attributes()'s fallback to
-    reading it straight off ``context``.
-    """
-    mock_plugins = SimpleNamespace(anaconda_channel_guide=False)
-    # Plain object, not MagicMock, so hasattr(context, ...) below only
-    # succeeds for attributes we actually set.
+    """All five conda.* keys are assembled with the expected values."""
     mock_context = SimpleNamespace(
         solver="asolver",
         active_prefix="/envs/myenv",
-        plugins=mock_plugins,
-        anaconda_anon_usage=True,
     )
     mocker.patch("conda_anaconda_telemetry.resource_attributes.context", mock_context)
     mocker.patch("conda_anaconda_telemetry.resource_attributes.conda_version", "26.5")
@@ -160,9 +119,6 @@ def test_get_conda_attributes(monkeypatch: MonkeyPatch, mocker: MockerFixture) -
         "conda.solver": "asolver",
         "conda.environment_kind": "named",
         "conda.ci_detected": "true",
-        "conda.plugins": (
-            '{"anaconda_channel_guide": false, "anaconda_anon_usage": true}'
-        ),
     }
 
 
@@ -176,11 +132,9 @@ def test_get_conda_attributes_no_ci(
             solver="asolver",
             active_prefix=None,
             root_prefix="/root",
-            plugins=SimpleNamespace(),
         ),
     )
     monkeypatch.delenv("CI", raising=False)
 
     result = get_conda_attributes()
     assert result["conda.ci_detected"] == "false"
-    assert result["conda.plugins"] == "{}"
