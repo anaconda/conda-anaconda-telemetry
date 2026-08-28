@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
+from conda.base.context import context
 
 from conda_anaconda_telemetry.hooks import (
     HEADER_CHANNELS,
@@ -165,7 +166,10 @@ def test_get_channel_urls_strips_basic_auth_credentials(mocker: MockerFixture) -
 
     urls = get_channel_urls()
 
-    assert not any("user:pass" in url for url in urls)
+    assert urls == (
+        f"https://private.example.com/channel/{context.subdir}",
+        "https://private.example.com/channel/noarch",
+    )
 
 
 def test_disabled_plugin(mocker: MockerFixture) -> None:
