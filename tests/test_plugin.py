@@ -212,9 +212,8 @@ def test_report_error_signal_payload_baseline(
 
     resource_attributes = mock_initialize.call_args.kwargs["attributes"]
     attributes = resource_attributes._get_attributes()
-    parameters = attributes["parameters"]
 
-    assert set(parameters) == {
+    assert {
         "conda.version",
         "conda.python_version",
         "conda.solver",
@@ -224,11 +223,11 @@ def test_report_error_signal_payload_baseline(
         "installer.version",
         "installer.platform",
         "installer.type",
-    }
+    }.issubset(attributes)
     # Only spot-checking two values here; the other attributes are already
     # covered by resource_attributes.py's own tests.
-    assert parameters["conda.version"] == conda.__version__
-    assert parameters["installer.name"] == "TestInstaller"
+    assert attributes["conda.version"] == conda.__version__
+    assert attributes["installer.name"] == "TestInstaller"
 
     mock_send_event.assert_called_once_with(
         event_name="install.error", body="", attributes=mock_install_attributes

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -106,9 +107,13 @@ class AnacondaTelemetry:
         attributes.set_attributes(
             platform=self.platform,
             environment=self.environment.value,
+        )
+        # Apply setattr() directly to ensure these are top-level attributes.
+        for key, value in {
             **get_installer_attributes(),
             **get_conda_attributes(),
-        )
+        }.items():
+            setattr(attributes, key, value)
         return attributes
 
     def initialize(self) -> None:
@@ -163,10 +168,13 @@ def get_install_attributes(event: CondaExceptionEvent) -> dict[str, Any]:
         "signal.version": SIGNAL_VERSION,
         # context.channels is the fully merged channel list (CLI + condarc +
         # defaults); contrast with install.overrides below.
-        "install.condarc.channels": [
-            {"channel": channel, "tos_accepted": tos_are_accepted(channel)}
-            for channel in context.channels
-        ],
+        # JSON-encoded because OTel attributes can't hold a list of dicts.
+        "install.condarc.channels": json.dumps(
+            [
+                {"channel": channel, "tos_accepted": tos_are_accepted(channel)}
+                for channel in context.channels
+            ]
+        ),
         "install.condarc.channel_priority": str(context.channel_priority),
         "install.override_channels": bool(argparse_args.override_channels),
         # This invocation's -c/--channel overrides, not the merged channel list.
