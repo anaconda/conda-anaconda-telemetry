@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -168,10 +169,12 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
     assert attributes == {
         "signal.name": "install",
         "signal.version": "1",
-        "install.condarc.channels": [
-            {"channel": "defaults", "tos_accepted": True},
-            {"channel": "main-x", "tos_accepted": True},
-        ],
+        "install.condarc.channels": json.dumps(
+            [
+                {"channel": "defaults", "tos_accepted": True},
+                {"channel": "main-x", "tos_accepted": True},
+            ]
+        ),
         "install.condarc.channel_priority": "strict",
         "install.override_channels": False,
         "install.overrides": ["conda-forge", "foobar"],
