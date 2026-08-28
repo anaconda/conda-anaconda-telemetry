@@ -9,12 +9,13 @@ import logging
 import re
 import time
 import typing
+from urllib.parse import urlparse
 
 from conda.base.context import context
 from conda.cli.main_list import list_packages
 from conda.common.configuration import PrimitiveParameter
 from conda.common.url import mask_anaconda_token
-from conda.models.channel import all_channel_urls
+from conda.models.channel import Channel, all_channel_urls
 from conda.models.match_spec import MatchSpec
 from conda.plugins import CondaRequestHeader, CondaSetting, hookimpl
 
@@ -87,6 +88,15 @@ KNOWN_PUBLIC_CHANNELS = frozenset(
     {"anaconda", "conda-forge", "defaults", "main", "main-x", "msys2", "r"}
 )
 
+KNOWN_PUBLIC_HOSTS = frozenset({"repo.anaconda.com", "conda.anaconda.org"})
+
+
+def is_public_channel(channel: Channel) -> bool:
+    """Return whether ``channel`` is known-public by name and host."""
+    if channel.canonical_name not in KNOWN_PUBLIC_CHANNELS:
+        return False
+    return all(urlparse(url).hostname in KNOWN_PUBLIC_HOSTS for url in channel.urls())
+
 
 def _get_public_package_name(spec: str) -> str | None:
     """Parse a raw package spec and return its name, name only, if public.
@@ -95,7 +105,7 @@ def _get_public_package_name(spec: str) -> str | None:
     """
     match_spec = MatchSpec(spec)
     channel = match_spec.get("channel")
-    if channel is not None and channel.canonical_name not in KNOWN_PUBLIC_CHANNELS:
+    if channel is not None and not is_public_channel(channel):
         return None
     return match_spec.name
 
