@@ -149,8 +149,6 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
         cmd="install",
         override_channels=False,
         channel_priority="strict",
-        use_local=False,
-        dry_run=False,
         channel=["conda-forge", "foobar"],
         packages=["pkg_foo", "defaults::pkg_bar"],
     )
@@ -162,81 +160,21 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
             channel_priority="strict",
         ),
     )
-    mocker.patch(
-        "conda_anaconda_telemetry.otel.get_plugin_settings",
-        return_value={"auto_accept_tos": False},
-    )
     mocker.patch("conda_anaconda_telemetry.otel.tos_are_accepted", return_value=True)
 
-    event = SimpleNamespace(
-        exc_type=PackagesNotFoundError,
-        argv=("conda", "install", "-c", "conda-forge", "-c", "foobar", "pkg_foo"),
-    )
+    event = SimpleNamespace(exc_type=PackagesNotFoundError)
     attributes = get_install_attributes(event)
 
     assert attributes == {
         "signal.name": "install",
         "signal.version": "1",
-        "conda.raw_command": "install -c conda-forge -c foobar pkg_foo",
         "install.condarc.channels": [
             {"channel": "defaults", "tos_accepted": True},
             {"channel": "main-x", "tos_accepted": True},
         ],
         "install.condarc.channel_priority": "strict",
         "install.override_channels": False,
-        "install.strict_channel_priority": True,
-        "install.no_channel_priority": False,
-        "install.use_local": False,
-        "install.auto_accept": False,
-        "install.dry_run": False,
         "install.overrides": ["conda-forge", "foobar"],
         "install.packages": ["pkg_foo", "defaults::pkg_bar"],
         "exception.name": "PackagesNotFoundError",
     }
-
-
-@pytest.mark.parametrize(
-    "raw_channel_priority,expected_strict,expected_no_priority",
-    [
-        ("strict", True, False),
-        ("disabled", False, True),
-        (None, False, False),  # flag not passed this invocation
-    ],
-)
-def test_get_install_attributes_channel_priority_derivation(
-    mocker: MockerFixture,
-    raw_channel_priority: str | None,
-    expected_strict: bool,
-    expected_no_priority: bool,
-) -> None:
-    """strict/no_channel_priority reflect this invocation's raw CLI flag.
-
-    This is independent of install.condarc.channel_priority (the effective,
-    merged value), which is fixed to "flexible" here to prove the two don't
-    move together.
-    """
-    argparse_args = SimpleNamespace(
-        cmd="install",
-        override_channels=False,
-        channel_priority=raw_channel_priority,
-        use_local=False,
-        dry_run=False,
-        channel=[],
-        packages=["pkg_foo"],
-    )
-    mocker.patch(
-        "conda_anaconda_telemetry.otel.context",
-        mocker.MagicMock(
-            _argparse_args=argparse_args,
-            channels=(),
-            channel_priority="flexible",
-        ),
-    )
-    mocker.patch("conda_anaconda_telemetry.otel.get_plugin_settings", return_value={})
-
-    event = SimpleNamespace(exc_type=PackagesNotFoundError, argv=("conda", "install"))
-    attributes = get_install_attributes(event)
-
-    assert attributes["install.condarc.channel_priority"] == "flexible"
-    assert attributes["install.strict_channel_priority"] is expected_strict
-    assert attributes["install.no_channel_priority"] is expected_no_priority

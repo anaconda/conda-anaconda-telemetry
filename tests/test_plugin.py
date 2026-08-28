@@ -220,7 +220,6 @@ def test_report_error_signal_payload_baseline(
         "conda.solver",
         "conda.environment_kind",
         "conda.ci_detected",
-        "conda.plugins",
         "installer.name",
         "installer.version",
         "installer.platform",

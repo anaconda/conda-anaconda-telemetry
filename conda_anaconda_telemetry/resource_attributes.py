@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import functools
 import json
 import os
 import platform
@@ -18,33 +17,12 @@ from conda.common.path import paths_equal
 #: Required fields in ``.installer.info``, as written by constructor
 INSTALLER_INFO_FIELDS = ("name", "version", "platform", "type")
 
-ALLOWED_PLUGIN_SETTINGS = (
-    "anaconda_channel_guide",
-    "anaconda_anon_usage",
-    # Registered by conda-anaconda-tos
-    "auto_accept_tos",
-)
-
 
 def to_environment_kind(prefix: str) -> str:
     """Classify a prefix without exposing its (possibly identifying) name."""
     if paths_equal(prefix, context.root_prefix):
         return "base"
     return "named" if env_name(prefix) != prefix else "prefix"
-
-
-@functools.lru_cache(None)
-def get_plugin_settings() -> dict[str, bool]:
-    """Return allowlisted conda_settings-hook plugin values.
-
-    Cached per process since these settings don't change mid-run.
-    """
-    plugins = context.plugins
-    return {
-        name: bool(getattr(plugins, name))
-        for name in ALLOWED_PLUGIN_SETTINGS
-        if hasattr(plugins, name)
-    }
 
 
 def get_installer_attributes() -> dict[str, str]:
@@ -75,21 +53,11 @@ def get_installer_attributes() -> dict[str, str]:
 def get_conda_attributes() -> dict[str, str]:
     """Gather all ``conda.*`` resource attributes.
 
-    ``ResourceAttributes.set_attributes()`` stores wildcard values via plain
-    ``str()``, not ``json.dumps()`` - so non-string values (the bool and the
-    dict here) are JSON-encoded ourselves first, otherwise they'd land in the
-    signal as Python's ``repr()`` (single-quoted dicts), which isn't
-    valid JSON.
+    Non-string values must be JSON-encoded before being returned:
+    ``ResourceAttributes.set_attributes()`` stores wildcard values via
+    ``str()``, not ``json.dumps()``, which would otherwise produce Python's
+    ``repr()`` instead of valid JSON.
     """
-    plugins = context.plugins
-    plugin_settings = {}
-    for name in ALLOWED_PLUGIN_SETTINGS:
-        # Most settings are registered by plugins under context.plugins, but
-        # anaconda_anon_usage is patched directly onto Context itself.
-        if hasattr(plugins, name):
-            plugin_settings[name] = bool(getattr(plugins, name))
-        elif hasattr(context, name):
-            plugin_settings[name] = bool(getattr(context, name))
     return {
         "conda.version": conda_version,
         "conda.python_version": platform.python_version(),
@@ -98,5 +66,4 @@ def get_conda_attributes() -> dict[str, str]:
             context.active_prefix or context.root_prefix
         ),
         "conda.ci_detected": json.dumps(boolify(os.environ.get("CI", ""))),
-        "conda.plugins": json.dumps(plugin_settings),
     }
