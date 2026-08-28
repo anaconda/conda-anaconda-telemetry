@@ -156,12 +156,21 @@ def test_install_headers(
     )
 
 
-def test_get_channel_urls_strips_basic_auth_credentials(mocker: MockerFixture) -> None:
-    """Channel URLs must not leak embedded HTTP Basic Auth credentials."""
+@pytest.mark.parametrize(
+    "channel",
+    [
+        "https://user:pass@private.example.com/channel",  # HTTP Basic Auth
+        "https://private.example.com/t/tk-123-456/channel",  # fake anaconda token
+    ],
+)
+def test_get_channel_urls_strips_credentials(
+    mocker: MockerFixture, channel: str
+) -> None:
+    """Channel URLs must not leak embedded Basic Auth credentials or tokens."""
     mocker.patch(
         "conda.base.context.Context.channels",
         new_callable=mocker.PropertyMock,
-        return_value=("https://user:pass@private.example.com/channel",),
+        return_value=(channel,),
     )
 
     urls = get_channel_urls()
