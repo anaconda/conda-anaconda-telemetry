@@ -56,6 +56,26 @@ def test_anaconda_telemetry_invalid_scheme(
 
 
 @pytest.mark.parametrize(
+    "default_endpoint",
+    [
+        "http://other.example.com",
+        "http://localhost.example.com",
+        "http://127.0.0.1.example.com",
+    ],
+)
+def test_anaconda_telemetry_rejects_non_loopback_cleartext(
+    monkeypatch: pytest.MonkeyPatch, default_endpoint: str
+) -> None:
+    """An endpoint using cleartext http on a non-loopback host raises
+    instead of silently sending telemetry to an arbitrary host.
+    """
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", default_endpoint)
+
+    with pytest.raises(ValueError, match=r"^A valid default endpoint must be set\.$"):
+        AnacondaTelemetry()
+
+
+@pytest.mark.parametrize(
     "default_endpoint,expected",
     [
         ("http://localhost:4318", True),

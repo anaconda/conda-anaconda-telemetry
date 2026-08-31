@@ -67,7 +67,14 @@ class AnacondaTelemetry:
         else:
             self.default_endpoint = "https://public.telemetry.anaconda.com/v1/logs"
 
-        if urlparse(self.default_endpoint).scheme not in ("http", "https", "grpc"):
+        parsed_endpoint = urlparse(self.default_endpoint)
+        if parsed_endpoint.scheme not in ("http", "https", "grpc"):
+            raise ValueError("A valid default endpoint must be set.")
+
+        if parsed_endpoint.scheme == "http" and parsed_endpoint.hostname not in (
+            "localhost",
+            "127.0.0.1",
+        ):
             raise ValueError("A valid default endpoint must be set.")
 
     def _make_config(self) -> Configuration:
