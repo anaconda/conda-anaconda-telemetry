@@ -15,7 +15,8 @@ from conda.cli.main_list import list_packages
 from conda.common.configuration import PrimitiveParameter
 from conda.common.url import mask_anaconda_token
 from conda.models.channel import all_channel_urls
-from conda.plugins import CondaRequestHeader, CondaSetting, hookimpl
+from conda.plugins import hookimpl
+from conda.plugins.types import CondaRequestHeader, CondaSetting
 
 try:
     from conda_build import __version__ as conda_build_version
