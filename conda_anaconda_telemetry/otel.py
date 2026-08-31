@@ -41,6 +41,12 @@ logger = logging.getLogger(__name__)
 #: bump manually whenever this contents/shape change.
 SIGNAL_VERSION = "1"
 
+#: Placeholder item limit for list-valued event attributes.
+LIST_ITEM_LIMIT = 50
+
+#: Placeholder UTF-8 byte limit for list-valued event attributes.
+LIST_BYTE_LIMIT = 500
+
 
 class Environment(Enum):
     """Environment enum."""
@@ -160,25 +166,53 @@ def tos_are_accepted(channel: str) -> bool | None:
         return None
 
 
+def _truncate(
+    items: list[Any],
+    item_limit: int = LIST_ITEM_LIMIT,
+    byte_limit: int = LIST_BYTE_LIMIT,
+) -> tuple[list[Any], bool]:
+    """Truncate a list to an item count and a serialized UTF-8 byte limit.
+
+    Returns the possibly-shortened list and whether anything was dropped.
+    """
+    truncated = len(items) > item_limit
+    kept: list[Any] = []
+    size = 2  # "[]"
+    for item in items[:item_limit]:
+        encoded_size = len(json.dumps(item).encode("utf-8")) + (1 if kept else 0)
+        if size + encoded_size > byte_limit:
+            truncated = True
+            break
+        kept.append(item)
+        size += encoded_size
+    return kept, truncated
+
+
 def get_install_attributes(event: CondaExceptionEvent) -> dict[str, Any]:
     """Gather event attributes for the install-command PackagesNotFoundError signal."""
     argparse_args = context._argparse_args
+
+    # context.channels is the fully merged channel list (CLI + condarc +
+    # defaults); contrast with install.overrides below.
+    channels, channels_truncated = _truncate(
+        [
+            {"channel": channel, "tos_accepted": tos_are_accepted(channel)}
+            for channel in context.channels
+        ]
+    )
+    # This invocation's -c/--channel overrides, not the merged channel list.
+    overrides, overrides_truncated = _truncate(list(argparse_args.channel or []))
+    packages, packages_truncated = _truncate(list(argparse_args.packages or []))
+
     return {
         "signal.name": argparse_args.cmd,
         "signal.version": SIGNAL_VERSION,
-        # context.channels is the fully merged channel list (CLI + condarc +
-        # defaults); contrast with install.overrides below.
         # JSON-encoded because OTel attributes can't hold a list of dicts.
-        "install.condarc.channels": json.dumps(
-            [
-                {"channel": channel, "tos_accepted": tos_are_accepted(channel)}
-                for channel in context.channels
-            ]
-        ),
+        "install.condarc.channels": json.dumps(channels),
         "install.condarc.channel_priority": str(context.channel_priority),
         "install.override_channels": bool(argparse_args.override_channels),
-        # This invocation's -c/--channel overrides, not the merged channel list.
-        "install.overrides": list(argparse_args.channel or []),
-        "install.packages": list(argparse_args.packages or []),
+        "install.overrides": overrides,
+        "install.packages": packages,
         "exception.name": event.exc_type.__name__,
+        "truncated": channels_truncated or overrides_truncated or packages_truncated,
     }

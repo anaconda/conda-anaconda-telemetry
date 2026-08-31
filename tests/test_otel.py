@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import json
+import platform
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import anaconda_opentelemetry.signals as sig
 import pytest
+from conda import __version__ as conda_version
 from conda.exceptions import PackagesNotFoundError
 
 from conda_anaconda_telemetry.otel import (
+    LIST_BYTE_LIMIT,
+    LIST_ITEM_LIMIT,
     AnacondaTelemetry,
     get_install_attributes,
     tos_are_accepted,
@@ -108,6 +112,16 @@ def test_make_config(
     assert config._get_console_exporter() is expected
 
 
+def test_make_attributes_system_info() -> None:
+    """OS, Python, and conda version attributes reflect the real running system."""
+    attributes = AnacondaTelemetry()._make_attributes()
+
+    assert attributes.os_type == platform.system()
+    assert attributes.os_version == platform.release()
+    assert attributes.python_version == platform.python_version()
+    assert getattr(attributes, "conda.version") == conda_version
+
+
 def test_tos_are_accepted_package_not_installed(mocker: MockerFixture) -> None:
     """When conda_anaconda_tos isn't importable, ToS acceptance is None."""
     mocker.patch("conda_anaconda_telemetry.otel.get_local_metadata", None)
@@ -180,4 +194,55 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
         "install.overrides": ["conda-forge", "foobar"],
         "install.packages": ["pkg_foo", "defaults::pkg_bar"],
         "exception.name": "PackagesNotFoundError",
+        "truncated": False,
     }
+
+
+@pytest.mark.parametrize(
+    "packages,expected_kept,expected_truncated",
+    [
+        (["pkg_foo", "pkg_bar"], ["pkg_foo", "pkg_bar"], False),
+        (
+            # One more package than LIST_ITEM_LIMIT allows.
+            [f"pkg_{i}" for i in range(LIST_ITEM_LIMIT + 1)],
+            [f"pkg_{i}" for i in range(LIST_ITEM_LIMIT)],
+            True,
+        ),
+        (
+            # A first package that fits comfortably, and a second one whose
+            # own serialized size alone already exceeds LIST_BYTE_LIMIT.
+            ["pkg_foo", "x" * LIST_BYTE_LIMIT],
+            ["pkg_foo"],
+            True,
+        ),
+    ],
+)
+def test_get_install_attributes_truncation(
+    mocker: MockerFixture,
+    packages: list[str],
+    expected_kept: list[str],
+    expected_truncated: bool,
+) -> None:
+    """install.packages is capped by item count and by serialized byte size."""
+    argparse_args = SimpleNamespace(
+        cmd="install",
+        override_channels=False,
+        channel_priority="strict",
+        channel=[],
+        packages=packages,
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.otel.context",
+        mocker.MagicMock(
+            _argparse_args=argparse_args,
+            channels=(),
+            channel_priority="strict",
+        ),
+    )
+    mocker.patch("conda_anaconda_telemetry.otel.tos_are_accepted", return_value=True)
+
+    event = SimpleNamespace(exc_type=PackagesNotFoundError)
+    attributes = get_install_attributes(event)
+
+    assert attributes["install.packages"] == expected_kept
+    assert attributes["truncated"] == expected_truncated
