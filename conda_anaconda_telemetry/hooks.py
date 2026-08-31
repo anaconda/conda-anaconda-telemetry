@@ -115,7 +115,7 @@ def get_virtual_packages() -> tuple[str, ...]:
 
 def get_channel_urls() -> tuple[str, ...]:
     """Return a list of currently configured channel URLs with tokens masked."""
-    channels = list(all_channel_urls(context.channels))
+    channels = list(all_channel_urls(context.channels, with_credentials=False))
     return tuple(mask_anaconda_token(c) for c in channels)
 
 

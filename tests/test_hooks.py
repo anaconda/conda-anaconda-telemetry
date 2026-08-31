@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
+from conda.base.context import context
 
 from conda_anaconda_telemetry.hooks import (
     HEADER_CHANNELS,
@@ -19,6 +20,7 @@ from conda_anaconda_telemetry.hooks import (
     _conda_request_headers,
     conda_request_headers,
     conda_settings,
+    get_channel_urls,
     should_submit_request_headers,
     timer,
 )
@@ -151,6 +153,31 @@ def test_install_headers(
 
     assert len(header_names.intersection(expected_header_names)) == len(
         expected_header_names
+    )
+
+
+@pytest.mark.parametrize(
+    "channel",
+    [
+        "https://user:pass@private.example.com/channel",  # HTTP Basic Auth
+        "https://private.example.com/t/tk-123-456/channel",  # fake anaconda token
+    ],
+)
+def test_get_channel_urls_strips_credentials(
+    mocker: MockerFixture, channel: str
+) -> None:
+    """Channel URLs must not leak embedded Basic Auth credentials or tokens."""
+    mocker.patch(
+        "conda.base.context.Context.channels",
+        new_callable=mocker.PropertyMock,
+        return_value=(channel,),
+    )
+
+    urls = get_channel_urls()
+
+    assert urls == (
+        f"https://private.example.com/channel/{context.subdir}",
+        "https://private.example.com/channel/noarch",
     )
 
 
