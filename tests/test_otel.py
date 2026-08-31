@@ -72,23 +72,24 @@ def test_atel_default_endpoint_falls_through_for_untrusted_values(
 
     telemetry = AnacondaTelemetry()
 
-    assert telemetry.default_endpoint == PRODUCTION_ENDPOINT
+    assert telemetry.default_endpoint == DUMMY_ENDPOINT
 
 
 @pytest.mark.parametrize(
-    "default_endpoint,expected",
+    "environment,expected",
     [
-        (DUMMY_ENDPOINT, True),
-        (PRODUCTION_ENDPOINT, False),
+        ("development", True),
+        ("production", False),
     ],
 )
 def test_make_config(
-    monkeypatch: pytest.MonkeyPatch, default_endpoint: str, expected: bool
+    monkeypatch: pytest.MonkeyPatch, environment: str, expected: bool
 ) -> None:
     """Only a localhost endpoint skips the internet check and uses the
-    console exporter.
+    console exporter. ATEL_DEFAULT_ENDPOINT can no longer pick a non-loopback
+    endpoint (Task 1), so this now varies via ATEL_ENVIRONMENT instead.
     """
-    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", default_endpoint)
+    monkeypatch.setenv("ATEL_ENVIRONMENT", environment)
 
     config = AnacondaTelemetry()._make_config()
 
@@ -107,7 +108,10 @@ def test_atel_logging_endpoint_env_var_does_not_override_pinned_endpoint(
     telemetry = AnacondaTelemetry()
     config = telemetry._make_config()
 
-    assert config._get_logging_endpoint() == telemetry.default_endpoint
+    # _get_logging_endpoint() appends "/v1/logs" when default_endpoint doesn't
+    # already end with it, so compare with startswith rather than equality.
+    assert config._get_logging_endpoint() != ATTACKER_ENDPOINT
+    assert config._get_logging_endpoint().startswith(telemetry.default_endpoint)
 
 
 @pytest.mark.parametrize(
@@ -158,8 +162,8 @@ def test_auth_token_env_vars_are_neutralized(
     "proxy_servers,expected_proxy_url",
     [
         ({}, None),
-        ({"https": TRUSTED_PROXY}, TRUSTED_PROXY),
-        ({"https://public.telemetry.anaconda.com": TRUSTED_PROXY}, TRUSTED_PROXY),
+        ({"http": TRUSTED_PROXY}, TRUSTED_PROXY),
+        ({"http://localhost": TRUSTED_PROXY}, TRUSTED_PROXY),
     ],
 )
 def test_proxy_url_comes_from_conda_not_atel_proxy_url(
