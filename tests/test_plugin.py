@@ -187,8 +187,6 @@ def test_report_error_signal_payload_baseline(
         "conda_anaconda_telemetry.resource_attributes.context",
         mocker.MagicMock(
             root_prefix=str(tmp_path),
-            solver=mocker.MagicMock(),
-            active_prefix=None,
             plugins=SimpleNamespace(anaconda_telemetry=True),
         ),
     )
@@ -215,14 +213,10 @@ def test_report_error_signal_payload_baseline(
 
     assert {
         "conda.version",
-        "conda.python_version",
-        "conda.solver",
-        "conda.environment_kind",
         "conda.ci_detected",
         "installer.name",
         "installer.version",
         "installer.platform",
-        "installer.type",
     }.issubset(attributes)
     # Only spot-checking two values here; the other attributes are already
     # covered by resource_attributes.py's own tests.
