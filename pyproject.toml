@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
   "conda >=26.5",
   "anaconda-opentelemetry >=1.2.2",  # require at least 1.2.2 for hashed hostnames
+  "requests",
 ]
 description = "A conda plugin for Anaconda Telemetry"
 dynamic = [
