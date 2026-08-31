@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING
 
 import conda
 import pytest
-from conda.exceptions import PackagesNotFoundError
+from conda.exceptions import (
+    PackageNotInstalledError,
+    PackagesNotFoundError,
+    PackagesNotFoundInChannelsError,
+)
 from conda.plugins.hookspec import CondaSpecs
 from conda.plugins.manager import CondaPluginManager
 
@@ -137,6 +141,61 @@ def test_report_error_happy_path(
     telemetry.send_event.assert_called_once_with(
         "install.pnfe", "", mock_install_attributes
     )
+
+
+def test_report_error_channel_resolution_failure(
+    plugin_manager: CondaPluginManagerType,
+    mocker: MockerFixture,
+    mock_install_attributes: dict,
+) -> None:
+    """A real channel-resolution failure during install sends telemetry."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context._argparse_args",
+        mocker.MagicMock(cmd="install"),
+    )
+    telemetry = mocker.MagicMock()
+    telemetry_cls = mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
+    )
+
+    raise_and_dispatch(
+        plugin_manager, PackagesNotFoundInChannelsError(["numpy"], ["main-x"])
+    )
+
+    telemetry_cls.assert_called_once()
+    telemetry.initialize.assert_called_once()
+    telemetry.send_event.assert_called_once_with(
+        "install.error", "", mock_install_attributes
+    )
+
+
+def test_report_error_local_prefix_lookup_failure(
+    plugin_manager: CondaPluginManagerType, mocker: MockerFixture
+) -> None:
+    """Telemetry is never sent for a local-prefix lookup failure during update.
+
+    conda only raises ``PackageNotInstalledError`` from ``conda update``, never
+    from ``install``. Using that real command here (rather than some other
+    non-install command) tests the actual scenario the command guard is
+    meant to exclude.
+    """
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context._argparse_args",
+        mocker.MagicMock(cmd="update"),
+    )
+    telemetry_cls = mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
+
+    raise_and_dispatch(
+        plugin_manager, PackageNotInstalledError("/opt/conda/envs/foo", "numpy")
+    )
+
+    telemetry_cls.assert_not_called()
 
 
 def test_report_error_initialize_failure_is_consumed(mocker: MockerFixture) -> None:
