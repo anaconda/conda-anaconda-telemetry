@@ -37,7 +37,7 @@ def report_error(event: CondaExceptionEvent) -> None:
             return
         try:
             # anaconda-client's telemetry event naming convention
-            event_name = f"{conda_command}.error"
+            event_name = f"{conda_command}.pnfe"
             attributes = get_install_attributes(event)
             telemetry.send_event(event_name, "", attributes)
         except Exception as e:

@@ -135,7 +135,7 @@ def test_report_error_happy_path(
     telemetry_cls.assert_called_once()
     telemetry.initialize.assert_called_once()
     telemetry.send_event.assert_called_once_with(
-        "install.error", "", mock_install_attributes
+        "install.pnfe", "", mock_install_attributes
     )
 
 
@@ -211,20 +211,42 @@ def test_report_error_signal_payload_baseline(
     resource_attributes = mock_initialize.call_args.kwargs["attributes"]
     attributes = resource_attributes._get_attributes()
 
-    assert {
-        "conda.version",
-        "conda.ci_detected",
+    # Check exact key set, this implies that if the SDK silently adds/removes a
+    # field, or our code dropping one, fails this test.
+    expected_keys = {
+        "service_name",
+        "service_version",
+        "os_type",
+        "os_version",
+        "python_version",
+        "hostname",
+        "platform",
+        "environment",
+        "user_id",
+        "client_sdk_version",
+        "schema_version",
+        "parameters",
+        "aau.version",
+        "aau.client.token",
+        "aau.session.token",
+        "aau.environment.token",
+        "aau.organization.tokens",
+        "aau.installer.tokens",
+        "aau.machine.tokens",
         "installer.name",
         "installer.version",
         "installer.platform",
-    }.issubset(attributes)
+        "conda.version",
+        "conda.ci_detected",
+    }
+    assert attributes.keys() - {"aau.anaconda_auth.token"} == expected_keys
     # Only spot-checking two values here; the other attributes are already
     # covered by resource_attributes.py's own tests.
     assert attributes["conda.version"] == conda.__version__
     assert attributes["installer.name"] == "TestInstaller"
 
     mock_send_event.assert_called_once_with(
-        event_name="install.error", body="", attributes=mock_install_attributes
+        event_name="install.pnfe", body="", attributes=mock_install_attributes
     )
 
 
@@ -249,5 +271,5 @@ def test_report_error_send_event_failure_is_consumed(
     report_error(event)  # must not raise
 
     telemetry.send_event.assert_called_once_with(
-        "install.error", "", mock_install_attributes
+        "install.pnfe", "", mock_install_attributes
     )
