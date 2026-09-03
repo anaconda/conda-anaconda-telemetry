@@ -24,11 +24,15 @@ from conda_anaconda_telemetry.resource_attributes import (
 )
 
 try:
-    from conda_anaconda_tos.exceptions import CondaToSMissingError
+    from conda_anaconda_tos.exceptions import (
+        CondaToSMissingError,
+        CondaToSPermissionError,
+    )
     from conda_anaconda_tos.local import get_local_metadata
 except ImportError:
     get_local_metadata = None
     CondaToSMissingError = None
+    CondaToSPermissionError = None
 
 if TYPE_CHECKING:
     from typing import Any
@@ -164,6 +168,8 @@ def tos_are_accepted(channel: str) -> bool | None:
     except CondaToSMissingError:
         # TODO: Discuss what action to take if no ToS record exists
         return None
+    except CondaToSPermissionError:
+        return None
 
 
 def _truncate(
@@ -177,14 +183,12 @@ def _truncate(
     """
     truncated = len(items) > item_limit
     kept: list[Any] = []
-    size = 2  # "[]"
     for item in items[:item_limit]:
-        encoded_size = len(json.dumps(item).encode("utf-8")) + (1 if kept else 0)
-        if size + encoded_size > byte_limit:
+        candidate = [*kept, item]
+        if len(json.dumps(candidate).encode("utf-8")) > byte_limit:
             truncated = True
             break
-        kept.append(item)
-        size += encoded_size
+        kept = candidate
     return kept, truncated
 
 
@@ -203,16 +207,23 @@ def get_install_attributes(event: CondaExceptionEvent) -> dict[str, Any]:
     # This invocation's -c/--channel overrides, not the merged channel list.
     overrides, overrides_truncated = _truncate(list(argparse_args.channel or []))
     packages, packages_truncated = _truncate(list(argparse_args.packages or []))
+    missing_specs, missing_specs_truncated = _truncate(
+        [str(spec) for spec in event.exc_value.packages]
+    )
 
     return {
-        "signal.name": argparse_args.cmd,
-        "signal.version": SIGNAL_VERSION,
+        "command": argparse_args.cmd,
+        "event.schema_version": SIGNAL_VERSION,
         # JSON-encoded because OTel attributes can't hold a list of dicts.
         "install.condarc.channels": json.dumps(channels),
         "install.condarc.channel_priority": str(context.channel_priority),
         "install.override_channels": bool(argparse_args.override_channels),
-        "install.overrides": overrides,
-        "install.packages": packages,
+        "install.cli.channels": overrides,
+        "requested.packages": packages,
         "exception.name": event.exc_type.__name__,
-        "truncated": channels_truncated or overrides_truncated or packages_truncated,
+        "exception.missing_specs": missing_specs,
+        "truncated": channels_truncated
+        or overrides_truncated
+        or packages_truncated
+        or missing_specs_truncated,
     }

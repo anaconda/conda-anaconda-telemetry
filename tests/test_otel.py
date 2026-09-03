@@ -146,6 +146,29 @@ def test_tos_are_accepted_no_local_record(mocker: MockerFixture) -> None:
     assert tos_are_accepted("main-x") is None
 
 
+def test_tos_are_accepted_permission_error(mocker: MockerFixture) -> None:
+    """A permission error reading local ToS metadata means ToS acceptance is None."""
+
+    class _FakeMissingError(Exception):
+        pass
+
+    class _FakePermissionError(Exception):
+        pass
+
+    mocker.patch(
+        "conda_anaconda_telemetry.otel.CondaToSMissingError", _FakeMissingError
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.otel.CondaToSPermissionError", _FakePermissionError
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.otel.get_local_metadata",
+        mocker.MagicMock(side_effect=_FakePermissionError("permission denied")),
+    )
+
+    assert tos_are_accepted("main-x") is None
+
+
 def test_tos_are_accepted_real_record(mocker: MockerFixture) -> None:
     """When a local ToS record exists, its tos_accepted value is returned."""
     fake_pair = mocker.MagicMock()
@@ -177,12 +200,15 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
     )
     mocker.patch("conda_anaconda_telemetry.otel.tos_are_accepted", return_value=True)
 
-    event = SimpleNamespace(exc_type=PackagesNotFoundError)
+    event = SimpleNamespace(
+        exc_type=PackagesNotFoundError,
+        exc_value=SimpleNamespace(packages=("pkg_foo",)),
+    )
     attributes = get_install_attributes(event)
 
     assert attributes == {
-        "signal.name": "install",
-        "signal.version": "1",
+        "command": "install",
+        "event.schema_version": "1",
         "install.condarc.channels": json.dumps(
             [
                 {"channel": "defaults", "tos_accepted": True},
@@ -191,9 +217,10 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
         ),
         "install.condarc.channel_priority": "strict",
         "install.override_channels": False,
-        "install.overrides": ["conda-forge", "foobar"],
-        "install.packages": ["pkg_foo", "defaults::pkg_bar"],
+        "install.cli.channels": ["conda-forge", "foobar"],
+        "requested.packages": ["pkg_foo", "defaults::pkg_bar"],
         "exception.name": "PackagesNotFoundError",
+        "exception.missing_specs": ["pkg_foo"],
         "truncated": False,
     }
 
@@ -213,6 +240,15 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
             # own serialized size alone already exceeds LIST_BYTE_LIMIT.
             ["pkg_foo", "x" * LIST_BYTE_LIMIT],
             ["pkg_foo"],
+            True,
+        ),
+        (
+            # Each item's raw length is well under the byte limit, but
+            # summing them ignores the ", " separators added by JSON
+            # serialization. This verifies the limit is checked against
+            # the actual serialized size, not the raw concatenated length.
+            ["x" * 163, "x" * 163, "x" * 163],
+            ["x" * 163, "x" * 163],
             True,
         ),
     ],
@@ -241,8 +277,11 @@ def test_get_install_attributes_truncation(
     )
     mocker.patch("conda_anaconda_telemetry.otel.tos_are_accepted", return_value=True)
 
-    event = SimpleNamespace(exc_type=PackagesNotFoundError)
+    event = SimpleNamespace(
+        exc_type=PackagesNotFoundError,
+        exc_value=SimpleNamespace(packages=()),
+    )
     attributes = get_install_attributes(event)
 
-    assert attributes["install.packages"] == expected_kept
+    assert attributes["requested.packages"] == expected_kept
     assert attributes["truncated"] == expected_truncated
