@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -14,6 +15,7 @@ from urllib.parse import urlparse
 import anaconda_opentelemetry.signals as sig
 from anaconda_opentelemetry.attributes import ResourceAttributes
 from anaconda_opentelemetry.config import Configuration
+from conda.base.context import context
 
 from conda_anaconda_telemetry import APP_NAME, APP_VERSION
 from conda_anaconda_telemetry.resource_attributes import (
@@ -21,10 +23,33 @@ from conda_anaconda_telemetry.resource_attributes import (
     get_installer_attributes,
 )
 
+try:
+    from conda_anaconda_tos.exceptions import (
+        CondaToSMissingError,
+        CondaToSPermissionError,
+    )
+    from conda_anaconda_tos.local import get_local_metadata
+except ImportError:
+    get_local_metadata = None
+    CondaToSMissingError = None
+    CondaToSPermissionError = None
+
 if TYPE_CHECKING:
     from typing import Any
 
+    from conda.plugins.types import CondaExceptionEvent
+
 logger = logging.getLogger(__name__)
+
+#: Schema version for the created signal,
+#: bump manually whenever this contents/shape change.
+SIGNAL_VERSION = "1"
+
+#: Placeholder item limit for list-valued event attributes.
+LIST_ITEM_LIMIT = 50
+
+#: Placeholder UTF-8 byte limit for list-valued event attributes.
+LIST_BYTE_LIMIT = 500
 
 
 class Environment(Enum):
@@ -92,9 +117,13 @@ class AnacondaTelemetry:
         attributes.set_attributes(
             platform=self.platform,
             environment=self.environment.value,
+        )
+        # Apply setattr() directly to ensure these are top-level attributes.
+        for key, value in {
             **get_installer_attributes(),
             **get_conda_attributes(),
-        )
+        }.items():
+            setattr(attributes, key, value)
         return attributes
 
     def initialize(self) -> None:
@@ -124,3 +153,77 @@ class AnacondaTelemetry:
             logger.info("Event log sent successfully!")
         else:
             logger.debug("Event log failed to send.")
+
+
+def tos_are_accepted(channel: str) -> bool | None:
+    """Return whether channel's Terms of Service have been accepted.
+
+    Returns None if conda-anaconda-tos is not installed, or if the channel
+    has no local Terms of Service record at all.
+    """
+    if get_local_metadata is None:
+        return None
+    try:
+        return get_local_metadata(channel).metadata.tos_accepted
+    except CondaToSMissingError:
+        # TODO: Discuss what action to take if no ToS record exists
+        return None
+    except CondaToSPermissionError:
+        return None
+
+
+def _truncate(
+    items: list[Any],
+    item_limit: int = LIST_ITEM_LIMIT,
+    byte_limit: int = LIST_BYTE_LIMIT,
+) -> tuple[list[Any], bool]:
+    """Truncate a list to an item count and a serialized UTF-8 byte limit.
+
+    Returns the possibly-shortened list and whether anything was dropped.
+    """
+    truncated = len(items) > item_limit
+    kept: list[Any] = []
+    for item in items[:item_limit]:
+        candidate = [*kept, item]
+        if len(json.dumps(candidate).encode("utf-8")) > byte_limit:
+            truncated = True
+            break
+        kept = candidate
+    return kept, truncated
+
+
+def get_install_attributes(event: CondaExceptionEvent) -> dict[str, Any]:
+    """Gather event attributes for the install-command PackagesNotFoundError signal."""
+    argparse_args = context._argparse_args
+
+    # context.channels is the fully merged channel list (CLI + condarc +
+    # defaults); contrast with install.overrides below.
+    channels, channels_truncated = _truncate(
+        [
+            {"channel": channel, "tos_accepted": tos_are_accepted(channel)}
+            for channel in context.channels
+        ]
+    )
+    # This invocation's -c/--channel overrides, not the merged channel list.
+    overrides, overrides_truncated = _truncate(list(argparse_args.channel or []))
+    packages, packages_truncated = _truncate(list(argparse_args.packages or []))
+    missing_specs, missing_specs_truncated = _truncate(
+        [str(spec) for spec in event.exc_value.packages]
+    )
+
+    return {
+        "command": argparse_args.cmd,
+        "event.schema_version": SIGNAL_VERSION,
+        # JSON-encoded because OTel attributes can't hold a list of dicts.
+        "install.condarc.channels": json.dumps(channels),
+        "install.condarc.channel_priority": str(context.channel_priority),
+        "install.override_channels": bool(argparse_args.override_channels),
+        "install.cli.channels": overrides,
+        "requested.packages": packages,
+        "exception.name": event.exc_type.__name__,
+        "exception.missing_specs": missing_specs,
+        "truncated": channels_truncated
+        or overrides_truncated
+        or packages_truncated
+        or missing_specs_truncated,
+    }
