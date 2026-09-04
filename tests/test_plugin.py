@@ -175,12 +175,11 @@ def test_report_error_channel_resolution_failure(
 def test_report_error_local_prefix_lookup_failure(
     plugin_manager: CondaPluginManagerType, mocker: MockerFixture
 ) -> None:
-    """Telemetry is never sent for a local-prefix lookup failure during update.
+    """PackageNotInstalledError during update is excluded by the command guard.
 
-    conda only raises ``PackageNotInstalledError`` from ``conda update``, never
-    from ``install``. Using that real command here (rather than some other
-    non-install command) tests the actual scenario the command guard is
-    meant to exclude.
+    The exception inherits from ``PackagesNotFoundError``, so the observer
+    dispatches it. This verifies that ``report_error()`` returns for ``update``
+    before initializing telemetry.
     """
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
