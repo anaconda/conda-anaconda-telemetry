@@ -168,7 +168,7 @@ def test_report_error_channel_resolution_failure(
     telemetry_cls.assert_called_once()
     telemetry.initialize.assert_called_once()
     telemetry.send_event.assert_called_once_with(
-        "install.error", "", mock_install_attributes
+        "install.pnfe", "", mock_install_attributes
     )
 
 
