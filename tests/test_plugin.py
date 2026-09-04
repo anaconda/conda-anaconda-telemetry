@@ -559,9 +559,9 @@ def test_report_error_signal_payload_baseline(
         "conda_anaconda_telemetry.otel.sig.initialize_telemetry"
     )
     mock_send_event = mocker.patch("conda_anaconda_telemetry.otel.sig.send_event")
-    # send_event() also calls shutdown_telemetry() now, so mock that too
+    # send_event() also calls flush_telemetry() now, so mock that too
     # instead of letting it run for real here.
-    mock_shutdown = mocker.patch("conda_anaconda_telemetry.otel.sig.shutdown_telemetry")
+    mock_flush = mocker.patch("conda_anaconda_telemetry.otel.sig.flush_telemetry")
 
     event = SimpleNamespace(
         exc_type=PackagesNotFoundInChannelsError,
@@ -611,7 +611,7 @@ def test_report_error_signal_payload_baseline(
     mock_send_event.assert_called_once_with(
         event_name="install.pnfe", body="", attributes=mock_install_attributes
     )
-    mock_shutdown.assert_called_once()
+    mock_flush.assert_called_once()
 
 
 def test_report_error_send_event_failure_is_consumed(
