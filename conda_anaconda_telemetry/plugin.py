@@ -24,8 +24,11 @@ def report_error(event: CondaExceptionEvent) -> None:
     """Report an error to telemetry."""
     if context.plugins.anaconda_telemetry:  # Confirm plugin is enabled
         conda_command = context._argparse_args.cmd
-        # Only send telemetry during install command
-        if conda_command != "install":
+        # Only send telemetry during install and create commands.
+        # Note: conda has a pre-existing edge case where a third-party solver
+        # can cause install() to raise PackageNotInstalledError even outside
+        # of update, which this guard wouldn't catch. Needs its own follow-up.
+        if conda_command not in {"install", "create"}:
             return
         try:
             telemetry = AnacondaTelemetry()
