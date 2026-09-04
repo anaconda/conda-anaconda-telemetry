@@ -12,7 +12,6 @@ import pytest
 from conda import __version__ as conda_version
 from conda.exceptions import PackagesNotFoundError
 
-from conda_anaconda_telemetry import otel
 from conda_anaconda_telemetry.otel import (
     LIST_BYTE_LIMIT,
     LIST_ITEM_LIMIT,
@@ -122,18 +121,31 @@ def test_make_config(
 
 
 def test_anaconda_telemetry_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Shutdown telemetry within a fixed time budget."""
+    """shutdown() flushes telemetry within a fixed time budget instead of
+    relying on the SDK's own unbounded atexit handler.
+    """
     monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
-    recorded_kwargs = {}
-
-    def fake_shutdown_telemetry(**kwargs: float) -> None:
-        recorded_kwargs.update(kwargs)
-
-    monkeypatch.setattr(sig, "shutdown_telemetry", fake_shutdown_telemetry)
+    flush_calls = []
+    monkeypatch.setattr(sig, "flush_telemetry", lambda: flush_calls.append(True))
 
     AnacondaTelemetry().shutdown()
 
-    assert recorded_kwargs == {"timeout_seconds": otel._SHUTDOWN_TIMEOUT_SECONDS}
+    assert flush_calls == [True]
+
+
+def test_anaconda_telemetry_shutdown_is_repeatable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """shutdown() must flush every time it's called, not just the first."""
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+    flush_calls = []
+    monkeypatch.setattr(sig, "flush_telemetry", lambda: flush_calls.append(True))
+
+    telemetry = AnacondaTelemetry()
+    telemetry.shutdown()
+    telemetry.shutdown()
+
+    assert flush_calls == [True, True]
 
 
 def test_send_event_always_shuts_down(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -144,15 +156,38 @@ def test_send_event_always_shuts_down(monkeypatch: pytest.MonkeyPatch) -> None:
         raise RuntimeError("fail")
 
     monkeypatch.setattr(sig, "send_event", mock_send_event)
-    shutdown_calls = []
-    monkeypatch.setattr(
-        sig, "shutdown_telemetry", lambda **kwargs: shutdown_calls.append(kwargs)
-    )
+    flush_calls = []
+    monkeypatch.setattr(sig, "flush_telemetry", lambda: flush_calls.append(True))
 
     with pytest.raises(RuntimeError, match="fail"):
         AnacondaTelemetry().send_event("install.error", "")
 
-    assert shutdown_calls == [{"timeout_seconds": otel._SHUTDOWN_TIMEOUT_SECONDS}]
+    assert flush_calls == [True]
+
+
+def test_send_event_twice_in_one_process_flushes_both(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sending two events in one process should flush both, not just the first."""
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+
+    sent_events = []
+
+    # Named function instead of a lambda: linter dislikes `.append() or True`.
+    def fake_send_event(**kwargs: str) -> bool:
+        sent_events.append(kwargs)
+        return True
+
+    monkeypatch.setattr(sig, "send_event", fake_send_event)
+    flush_calls = []
+    monkeypatch.setattr(sig, "flush_telemetry", lambda: flush_calls.append(True))
+
+    telemetry = AnacondaTelemetry()
+    telemetry.send_event("install.error", "first")
+    telemetry.send_event("install.error", "second")
+
+    assert len(sent_events) == 2
+    assert flush_calls == [True, True]
 
 
 def test_make_attributes_system_info() -> None:
