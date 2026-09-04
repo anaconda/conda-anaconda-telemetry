@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -27,6 +28,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # How long shutdown() waits for buffered telemetry to flush before giving up.
+# Proposed, pending confirmation: a healthy flush is well under 1s
+# (see scripts/benchmark_timing.sh), a stuck collector waits up to 10s (the
+# exporter's own timeout). Note this value can't cut the request
+# short, only how long we wait for it before giving up.
 _SHUTDOWN_TIMEOUT_SECONDS = 2.0
 
 
@@ -136,12 +141,25 @@ class AnacondaTelemetry:
             )
 
             if result is True:
-                logger.info("Event log sent successfully!")
+                logger.info("Event log queued.")
             else:
                 logger.debug("Event log failed to send.")
         finally:
             self.shutdown()
 
     def shutdown(self) -> None:
-        """Flush and shut down telemetry within a fixed time budget."""
-        sig.shutdown_telemetry(timeout_seconds=_SHUTDOWN_TIMEOUT_SECONDS)
+        """Flush pending telemetry within a fixed time budget.
+
+        Uses flush_telemetry() instead of shutdown_telemetry(), which only
+        flushes once per process and does nothing on later calls. We bound
+        it ourselves with a thread/timeout since local testing showed the
+        SDK's own force_flush(timeout_millis=...) seems to ignore its
+        timeout argument.
+        """
+        # flush_telemetry() flushes everything in the process, not just ours.
+        # Fine today since we only use logging.
+        # TODO: Should we also invoke
+        # opentelemetry._logs.get_logger_provider().force_flush() here?
+        flush_thread = threading.Thread(target=sig.flush_telemetry, daemon=True)
+        flush_thread.start()
+        flush_thread.join(timeout=_SHUTDOWN_TIMEOUT_SECONDS)
