@@ -181,10 +181,14 @@ def test_tos_are_accepted_real_record(mocker: MockerFixture) -> None:
     assert tos_are_accepted("main-x") is True
 
 
-def test_get_install_attributes(mocker: MockerFixture) -> None:
-    """All install.* keys are assembled from context / argparse args."""
+@pytest.mark.parametrize("cmd", ["install", "create"])
+def test_get_install_attributes(mocker: MockerFixture, cmd: str) -> None:
+    """All install.* keys are assembled from context / argparse args.
+
+    Key names stay `install.*`-prefixed regardless of command.
+    """
     argparse_args = SimpleNamespace(
-        cmd="install",
+        cmd=cmd,
         override_channels=False,
         channel_priority="strict",
         channel=["conda-forge", "foobar"],
@@ -207,7 +211,7 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
     attributes = get_install_attributes(event)
 
     assert attributes == {
-        "command": "install",
+        "command": cmd,
         "event.schema_version": "1",
         "install.condarc.channels": json.dumps(
             [

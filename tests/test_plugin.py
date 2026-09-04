@@ -101,7 +101,7 @@ def test_report_error_disabled_plugin(
 def test_report_error_non_install_command(
     plugin_manager: CondaPluginManagerType, mocker: MockerFixture
 ) -> None:
-    """Telemetry is only sent for the install command."""
+    """Telemetry is only sent for the install and create commands."""
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
@@ -143,6 +143,33 @@ def test_report_error_happy_path(
     )
 
 
+def test_report_error_sends_event_on_create(
+    plugin_manager: CondaPluginManagerType,
+    mocker: MockerFixture,
+    mock_install_attributes: dict,
+) -> None:
+    """On create, telemetry is initialized and the event is sent."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context._argparse_args",
+        mocker.MagicMock(cmd="create"),
+    )
+    telemetry = mocker.MagicMock()
+    telemetry_cls = mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
+    )
+
+    raise_and_dispatch(plugin_manager, PackagesNotFoundError(["numpy"]))
+
+    telemetry_cls.assert_called_once()
+    telemetry.initialize.assert_called_once()
+    telemetry.send_event.assert_called_once_with(
+        "create.pnfe", "", mock_install_attributes
+    )
+
+
 def test_report_error_channel_resolution_failure(
     plugin_manager: CondaPluginManagerType,
     mocker: MockerFixture,
@@ -169,6 +196,35 @@ def test_report_error_channel_resolution_failure(
     telemetry.initialize.assert_called_once()
     telemetry.send_event.assert_called_once_with(
         "install.pnfe", "", mock_install_attributes
+    )
+
+
+def test_report_error_channel_resolution_failure_create(
+    plugin_manager: CondaPluginManagerType,
+    mocker: MockerFixture,
+    mock_install_attributes: dict,
+) -> None:
+    """A real channel-resolution failure during create sends telemetry."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context._argparse_args",
+        mocker.MagicMock(cmd="create"),
+    )
+    telemetry = mocker.MagicMock()
+    telemetry_cls = mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
+    )
+
+    raise_and_dispatch(
+        plugin_manager, PackagesNotFoundInChannelsError(["numpy"], ["main-x"])
+    )
+
+    telemetry_cls.assert_called_once()
+    telemetry.initialize.assert_called_once()
+    telemetry.send_event.assert_called_once_with(
+        "create.pnfe", "", mock_install_attributes
     )
 
 
