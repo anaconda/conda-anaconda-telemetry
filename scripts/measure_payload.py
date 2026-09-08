@@ -5,7 +5,7 @@
 """Measure the JSON-serialised byte size of each telemetry signal payload.
 
 Run inside a conda environment where conda_anaconda_telemetry is installed:
-    conda run -n cat python scripts/measure_payload.py
+    conda run -n <env> python scripts/measure_payload.py
 
 Payload size = len(json.dumps(...)) — local assembly only, not wire bytes.
 """
@@ -17,51 +17,34 @@ import sys
 from typing import cast
 
 
-def _get_installer_attributes_representative() -> tuple[dict[str, str], bool]:
-    """Real get_installer_attributes(), falling back to synthetic values.
-
-    .installer.info may be absent which would undercount payload size
-    relative to what a real installed distribution sends. Synthetic values
-    only kick in when the real ones are empty - a real .installer.info is
-    always preferred.
-
-    Returns (attributes, is_synthetic) so callers can report which one was
-    used without calling get_installer_attributes() a second time.
-    """
-    from conda_anaconda_telemetry.resource_attributes import get_installer_attributes
-
-    real = get_installer_attributes()
-    if real:
-        return real, False
-
-    return {
-        "installer.name": "FooBar",
-        "installer.version": "12345",
-        "installer.platform": "linux-64",
-        "installer.type": "sh",
-    }, True
-
-
 def _get_resource_attributes() -> tuple[dict[str, object], bool]:
     """Assemble the full set of resource attributes as sent to initialize_telemetry.
 
+    Builds the actual ResourceAttributes object AnacondaTelemetry sends (via
+    its private _make_attributes()), so this includes the os/python/hostname
+    and aau.* token fields added by anon_usage=True, not just a hand-picked
+    subset.
+
     Returns (attributes, installer_is_synthetic).
     """
-    from conda_anaconda_telemetry import APP_NAME, APP_VERSION
-    from conda_anaconda_telemetry.resource_attributes import get_conda_attributes
+    from conda_anaconda_telemetry.otel import AnacondaTelemetry
+    from conda_anaconda_telemetry.resource_attributes import get_installer_attributes
 
-    attrs: dict[str, object] = {
-        "service.name": APP_NAME,
-        "service.version": APP_VERSION.partition(".dev")[0],
-        "platform": "conda",
-        "environment": "production",
-    }
-    installer_attrs, installer_is_synthetic = _get_installer_attributes_representative()
-    attrs.update(installer_attrs)
-    attrs.update(get_conda_attributes())
-    # NOTE: if new attribute-gathering functions are added to resource_attributes.py
-    # before this script is run, add them here so the measurement stays complete.
-    return attrs, installer_is_synthetic
+    attributes = AnacondaTelemetry()._make_attributes()
+
+    # .installer.info may be absent on this machine, which would undercount
+    # payload size relative to what a real installed distribution sends.
+    installer_is_synthetic = not get_installer_attributes()
+    if installer_is_synthetic:
+        attributes.set_attributes(
+            **{
+                "installer.name": "FooBar",
+                "installer.version": "12345",
+                "installer.platform": "linux-64",
+                "installer.type": "sh",
+            }
+        )
+    return attributes._get_attributes(), installer_is_synthetic
 
 
 def _get_error_signal_attributes() -> dict[str, object]:
