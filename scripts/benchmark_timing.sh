@@ -9,7 +9,7 @@
 #   - hyperfine is on PATH
 #   - conda-anaconda-telemetry is installed in the active conda base.
 #
-# The install benchmarks use a scratch env at /tmp/cat-bench.
+# The install benchmarks use a scratch env under a unique temp directory.
 #
 # Usage:
 #   bash scripts/benchmark_timing.sh [--output-table] [--only=create,install,search,error] [-n=25]
@@ -31,6 +31,8 @@ set -euo pipefail
 ALL_BENCHMARKS=(create install search error)
 # Benchmarks that leave state in $BENCH_PREFIX and must be cleaned up after.
 CLEANUP_BENCHMARKS=(create install error)
+# Benchmarks that require $BENCH_PREFIX to already exist before they run.
+NEEDS_PREFIX_BENCHMARKS=(install error)
 
 is_known_benchmark() {
   local name="$1" candidate
@@ -43,6 +45,14 @@ is_known_benchmark() {
 needs_cleanup() {
   local name="$1" candidate
   for candidate in "${CLEANUP_BENCHMARKS[@]}"; do
+    [[ "$candidate" == "$name" ]] && return 0
+  done
+  return 1
+}
+
+needs_prefix() {
+  local name="$1" candidate
+  for candidate in "${NEEDS_PREFIX_BENCHMARKS[@]}"; do
     [[ "$candidate" == "$name" ]] && return 0
   done
   return 1
@@ -76,17 +86,25 @@ done
 
 WARMUP=2
 DISABLED="CONDA_PLUGINS_ANACONDA_TELEMETRY=false"
-BENCH_PREFIX="/tmp/cat-bench"
+BENCH_ROOT=$(mktemp -d)
+BENCH_PREFIX="${BENCH_ROOT}/cat-bench"
 
-# hyperfine runs each benchmarked command in a fresh, non-login shell, which
-# does not source conda's shell hook - without it, `conda` resolves to the
-# bare binary and channel config (condarc.d discovery) is incomplete,
-# causing spurious NoChannelsConfiguredError failures. Source the hook and
-# activate cat's base env in every benchmarked command and --prepare step.
+# hyperfine runs each command in a plain shell that hasn't set up conda, so
+# `conda` would fail. Source the shell hook and activate the base env (where
+# conda-anaconda-telemetry is installed) in every command and --prepare step.
 CONDA_INIT="source \"$HOME/miniconda3/etc/profile.d/conda.sh\" && conda activate base &&"
 
 JSON_DIR=$(mktemp -d)
-trap 'rm -rf "$JSON_DIR"' EXIT
+trap 'rm -rf "$JSON_DIR" "$BENCH_ROOT"' EXIT
+
+# Create the temporary prefix once, only if a selected benchmark needs it and
+# it doesn't already exist (e.g. run_create already made it). This is done once,
+# not per benchmark iteration.
+ensure_prefix() {
+  if [ ! -d "${BENCH_PREFIX}" ]; then
+    bash -c "${CONDA_INIT} conda create -p ${BENCH_PREFIX} python -y -q"
+  fi
+}
 
 # run_benchmark <name> <label> <prepare_cmd> <disabled_cmd> <enabled_cmd>
 # prepare_cmd may be the empty string to skip --prepare.
@@ -140,16 +158,37 @@ run_search() {
 }
 
 run_error() {
+  local enabled_cmd="${CONDA_INIT} conda install -p ${BENCH_PREFIX} nonexistent-packageabc"
+
+  # One-time sanity check (not timed) that this reproduces the error path
+  # we intend to measure, rather than e.g. EnvironmentLocationNotFound if
+  # $BENCH_PREFIX doesn't exist. Matches PackagesNotFoundError and its
+  # PackagesNotFoundInChannelsError/PackagesNotFoundInPrefixError subclasses.
+  local output
+  output=$(bash -c "$enabled_cmd" 2>&1) || true
+  if ! grep -q "PackagesNotFound" <<< "$output"; then
+    echo "run_error: expected a PackagesNotFound* error, got:" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+
   run_benchmark error \
     "conda install -p ${BENCH_PREFIX} nonexistent-packageabc (error path)" \
     "" \
     "${CONDA_INIT} ${DISABLED} conda install -p ${BENCH_PREFIX} nonexistent-packageabc 2>/dev/null; true" \
-    "${CONDA_INIT} conda install -p ${BENCH_PREFIX} nonexistent-packageabc 2>/dev/null; true"
+    "${enabled_cmd} 2>/dev/null; true"
 }
 
 echo "================================================================"
 echo "conda-anaconda-telemetry OTel benchmark (${RUNS} runs each)"
 echo "================================================================"
+
+for name in "${SELECTED[@]}"; do
+  if needs_prefix "$name"; then
+    ensure_prefix
+    break
+  fi
+done
 
 SUMMARIZE_ARGS=()
 NEEDS_ENV_CLEANUP=false
