@@ -23,14 +23,17 @@ import conda_anaconda_telemetry.plugin as plugin_module
 from conda_anaconda_telemetry.hooks import (
     conda_exception_observers,
     conda_post_commands,
+    conda_post_solves,
     conda_pre_commands,
     conda_pre_solves,
 )
 from conda_anaconda_telemetry.plugin import (
     capture_command,
     capture_requested_packages,
+    capture_resolved_packages,
     clear_command,
     report_error,
+    report_success,
 )
 
 if TYPE_CHECKING:
@@ -83,6 +86,17 @@ def reset_plugin_state() -> Generator[None, None, None]:
     clear_command()
 
 
+@pytest.fixture
+def mock_success_attributes(mocker: MockerFixture) -> dict:
+    """Stub get_success_attributes() so tests don't depend on live conda state."""
+    attributes = {"command": "install", "resolved.packages": ["numpy=1.26.0=py311h0"]}
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.get_success_attributes",
+        return_value=attributes,
+    )
+    return attributes
+
+
 def raise_and_dispatch(
     plugin_manager: CondaPluginManagerType, exc: BaseException
 ) -> None:
@@ -104,6 +118,14 @@ def capture_request(
     plugin_manager.invoke_pre_solves(
         frozenset(MatchSpec(p) for p in packages), frozenset()
     )
+
+
+def set_success_request(command: str, resolved_packages: list[str] | None) -> None:
+    """Populate the command state consumed by report_success()."""
+    plugin_module.command_request.command = plugin_module.TelemetryCommand(command)
+    plugin_module.command_request.requested_names = ["numpy"]
+    plugin_module.command_request.channels = ["defaults"]
+    plugin_module.command_request.resolved_packages = resolved_packages
 
 
 def test_conda_exception_observers_registration() -> None:
@@ -137,8 +159,16 @@ def test_conda_post_commands_registration() -> None:
     (post_command,) = conda_post_commands()
 
     assert post_command.name == "conda-anaconda-telemetry-post-command"
-    assert post_command.action is clear_command
+    assert post_command.action is report_success
     assert post_command.run_for == {"create", "install"}
+
+
+def test_conda_post_solves_registration() -> None:
+    """The hookimpl yields a post-solve hook for resolved packages."""
+    (post_solve,) = conda_post_solves()
+
+    assert post_solve.name == "conda-anaconda-telemetry-post-solve"
+    assert post_solve.action is capture_resolved_packages
 
 
 @pytest.mark.parametrize(
@@ -162,11 +192,20 @@ def test_capture_command(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
     plugin_module.command_request.requested_names = ["stale"]
+    plugin_module.command_request.channels = ["stale"]
+    plugin_module.command_request.resolved_packages = ["stale=1=0"]
 
     capture_command(command)
 
     assert plugin_module.command_request.command == expected_command
     assert plugin_module.command_request.requested_names is None
+    assert plugin_module.command_request.resolved_packages is None
+    if expected_command is None:
+        assert plugin_module.command_request.channels is None
+    else:
+        assert plugin_module.command_request.channels == list(
+            plugin_module.context.channels
+        )
 
 
 def test_capture_command_disabled_plugin(mocker: MockerFixture) -> None:
@@ -213,16 +252,51 @@ def test_capture_requested_packages(
     assert plugin_module.command_request.requested_names == expected_names
 
 
+def test_capture_resolved_packages(mocker: MockerFixture) -> None:
+    """The post-solve hook stores the most recent linked package records."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    plugin_module.command_request.command = plugin_module.TelemetryCommand.INSTALL
+    first = mocker.MagicMock(name="first")
+    first.name, first.version, first.build = "numpy", "1.25.0", "py311h0"
+    second = mocker.MagicMock(name="second")
+    second.name, second.version, second.build = "numpy", "1.26.0", "py311h1"
+
+    capture_resolved_packages("repodata.json", (), (first,))
+    capture_resolved_packages("repodata.json", (), (second,))
+
+    assert plugin_module.command_request.resolved_packages == [
+        "numpy=1.26.0=py311h1"
+    ]
+
+
+def test_capture_resolved_packages_records_empty_solve(mocker: MockerFixture) -> None:
+    """An empty solve is captured as an empty list rather than missing state."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    plugin_module.command_request.command = plugin_module.TelemetryCommand.CREATE
+
+    capture_resolved_packages("repodata.json", (), ())
+
+    assert plugin_module.command_request.resolved_packages == []
+
+
 @pytest.mark.parametrize("command_name", ["install", None])
 def test_clear_command_resets_state(command_name: str | None) -> None:
-    """clear_command() resets both captured fields regardless of its argument."""
+    """clear_command() resets all captured state regardless of its argument."""
     plugin_module.command_request.command = plugin_module.TelemetryCommand.INSTALL
     plugin_module.command_request.requested_names = ["numpy"]
+    plugin_module.command_request.channels = ["defaults"]
+    plugin_module.command_request.resolved_packages = ["numpy=1.26.0=py311h0"]
 
     clear_command(command_name)
 
     assert plugin_module.command_request.command is None
     assert plugin_module.command_request.requested_names is None
+    assert plugin_module.command_request.channels is None
+    assert plugin_module.command_request.resolved_packages is None
 
 
 def test_post_commands_hook_clears_state_after_success(
@@ -233,12 +307,15 @@ def test_post_commands_hook_clears_state_after_success(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
     capture_request(plugin_manager, "install", ["numpy"])
+    plugin_manager.invoke_post_solves("repodata.json", (), ())
     assert plugin_module.command_request.command == "install"
 
     plugin_manager.invoke_post_commands("install")
 
     assert plugin_module.command_request.command is None
     assert plugin_module.command_request.requested_names is None
+    assert plugin_module.command_request.channels is None
+    assert plugin_module.command_request.resolved_packages is None
 
 
 def test_non_reportable_exception_clears_request(
@@ -596,3 +673,119 @@ def test_report_error_send_event_failure_is_consumed(
     telemetry.send_event.assert_called_once_with(
         "install.pnfe", "", mock_install_attributes
     )
+
+
+def test_report_success_disabled_plugin(mocker: MockerFixture) -> None:
+    """When the plugin setting is disabled, telemetry is never touched."""
+    set_success_request("install", ["numpy=1.26.0=py311h0"])
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", False
+    )
+    telemetry_cls = mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
+
+    report_success("install")
+
+    telemetry_cls.assert_not_called()
+    assert plugin_module.command_request.command is None
+
+
+def test_report_success_without_post_solve_is_skipped(mocker: MockerFixture) -> None:
+    """A command without captured post-solve state sends no success event."""
+    set_success_request("install", None)
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    attributes = mocker.patch(
+        "conda_anaconda_telemetry.plugin.get_success_attributes"
+    )
+    telemetry_cls = mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
+
+    report_success("install")
+
+    attributes.assert_not_called()
+    telemetry_cls.assert_not_called()
+    assert plugin_module.command_request.command is None
+
+
+def test_report_success_initialize_failure_is_consumed(mocker: MockerFixture) -> None:
+    """If initialize() raises, send_event is never called and nothing propagates."""
+    set_success_request("install", ["numpy=1.26.0=py311h0"])
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.get_success_attributes", return_value={}
+    )
+    telemetry = mocker.MagicMock()
+    telemetry.initialize.side_effect = RuntimeError("error")
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
+    )
+
+    report_success("install")  # must not raise
+
+    telemetry.send_event.assert_not_called()
+
+
+def test_report_success_attribute_gathering_failure_is_consumed(
+    mocker: MockerFixture,
+) -> None:
+    """If get_success_attributes() raises, telemetry is never touched."""
+    set_success_request("install", ["numpy=1.26.0=py311h0"])
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.get_success_attributes",
+        side_effect=RuntimeError("error"),
+    )
+    telemetry_cls = mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
+
+    report_success("install")  # must not raise
+
+    telemetry_cls.assert_not_called()
+
+
+def test_report_success_send_event_failure_is_consumed(
+    mocker: MockerFixture, mock_success_attributes: dict
+) -> None:
+    """If send_event() raises, the failure is consumed rather than propagating."""
+    set_success_request("install", ["numpy=1.26.0=py311h0"])
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    telemetry = mocker.MagicMock()
+    telemetry.send_event.side_effect = RuntimeError("error")
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
+    )
+
+    report_success("install")  # must not raise
+
+    telemetry.send_event.assert_called_once_with(
+        "install.success", "", mock_success_attributes
+    )
+
+
+@pytest.mark.parametrize("command", ["install", "create"])
+def test_report_success_sends_event(
+    mocker: MockerFixture, mock_success_attributes: dict, command: str
+) -> None:
+    """On a clean install/create completion, telemetry is initialized and sent."""
+    set_success_request(command, ["numpy=1.26.0=py311h0"])
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    telemetry = mocker.MagicMock()
+    telemetry_cls = mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
+    )
+
+    report_success(command)
+
+    telemetry_cls.assert_called_once()
+    telemetry.initialize.assert_called_once()
+    telemetry.send_event.assert_called_once_with(
+        f"{command}.success", "", mock_success_attributes
+    )
+    assert plugin_module.command_request.command is None

@@ -15,11 +15,13 @@ from conda.exceptions import PackagesNotFoundInChannelsError
 from conda_anaconda_telemetry.otel import (
     AnacondaTelemetry,
     get_install_attributes,
+    get_success_attributes,
     package_names,
 )
 
 if TYPE_CHECKING:
     from conda.models.match_spec import MatchSpec
+    from conda.models.records import PackageRecord
     from conda.plugins.types import (
         CondaExceptionEvent,
     )
@@ -45,6 +47,8 @@ class CommandRequest:
 
     command: TelemetryCommand | None = None
     requested_names: list[str] | None = None
+    channels: list[str] | None = None
+    resolved_packages: list[str] | None = None
 
 
 command_request = CommandRequest()
@@ -53,11 +57,15 @@ command_request = CommandRequest()
 def capture_command(command: str) -> None:
     """Pre-command hook to record the active command and reset old state."""
     command_request.requested_names = None
+    command_request.channels = None
+    command_request.resolved_packages = None
     if not context.plugins.anaconda_telemetry:
         command_request.command = None
         return
     try:
         command_request.command = TelemetryCommand(command)
+        # Success events use the configured channels because they have no error snapshot.
+        command_request.channels = list(context.channels)
     except ValueError:
         command_request.command = None
 
@@ -70,6 +78,18 @@ def capture_requested_packages(
         command_request.requested_names = package_names(list(specs_to_add))
 
 
+def capture_resolved_packages(
+    _repodata_fn: str,
+    _unlink_precs: tuple[PackageRecord, ...],
+    link_precs: tuple[PackageRecord, ...],
+) -> None:
+    """Save the most recent solve's linked packages for success telemetry."""
+    if context.plugins.anaconda_telemetry and command_request.command is not None:
+        command_request.resolved_packages = [
+            f"{record.name}={record.version}={record.build}" for record in link_precs
+        ]
+
+
 def clear_command(_command_name: str | None = None) -> None:
     """Reset telemetry state.
 
@@ -77,6 +97,8 @@ def clear_command(_command_name: str | None = None) -> None:
     """
     command_request.command = None
     command_request.requested_names = None
+    command_request.channels = None
+    command_request.resolved_packages = None
 
 
 # Generic error reporting function which can be expanded to track any error, as needed.
@@ -116,4 +138,37 @@ def report_error(event: CondaExceptionEvent) -> None:
             logger.debug("Failed to send telemetry for %s", event.exc_type, exc_info=e)
     finally:
         # Post-command hooks don't run on failure, so clear state here too.
+        clear_command()
+
+
+def report_success(command: str) -> None:
+    """Report a successful install/create completion to telemetry."""
+    try:
+        if not context.plugins.anaconda_telemetry:
+            return
+        request = command_request
+        if request.command is None or request.requested_names is None:
+            return
+        # Skip success telemetry when no post-solve result was captured.
+        if request.resolved_packages is None or request.channels is None:
+            return
+        try:
+            attributes = get_success_attributes(
+                command=request.command.value,
+                channels=request.channels,
+                requested_names=request.requested_names,
+                resolved_packages=request.resolved_packages,
+            )
+        except Exception as e:
+            logger.debug(
+                "Failed to gather telemetry attributes for %s", command, exc_info=e
+            )
+            return
+        try:
+            telemetry = AnacondaTelemetry()
+            telemetry.initialize()
+            telemetry.send_event(f"{request.command.value}.success", "", attributes)
+        except Exception as e:
+            logger.debug("Failed to send telemetry for %s", command, exc_info=e)
+    finally:
         clear_command()
