@@ -46,7 +46,7 @@ LIST_BYTE_LIMIT = 500
 #: Channel names allowed in the install.channels payload; anything else is
 #: reported as OTHER_CHANNEL_LABEL so a channel URL or internal name can't
 #: reach the payload.
-KNOWN_INSTALL_CHANNELS = frozenset({"defaults", "main-x"})
+KNOWN_INSTALL_CHANNELS = frozenset({"defaults", "main", "main-x", "conda-forge"})
 OTHER_CHANNEL_LABEL = "other"
 
 
@@ -203,6 +203,7 @@ def get_install_attributes(
     """Build the event from captured package names and the failure snapshot."""
     missing_names = package_names(list(event.exc_value.packages))
     if missing_names is None:
+        logger.debug("Skipping telemetry because package names could not be read.")
         return None
 
     channels, channels_truncated = _truncate(
