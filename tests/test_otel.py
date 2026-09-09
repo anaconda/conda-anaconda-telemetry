@@ -17,7 +17,7 @@ from conda_anaconda_telemetry.otel import (
     LIST_ITEM_LIMIT,
     AnacondaTelemetry,
     get_install_attributes,
-    tos_are_accepted,
+    package_names,
 )
 
 if TYPE_CHECKING:
@@ -122,63 +122,32 @@ def test_make_attributes_system_info() -> None:
     assert getattr(attributes, "conda.version") == conda_version
 
 
-def test_tos_are_accepted_package_not_installed(mocker: MockerFixture) -> None:
-    """When conda_anaconda_tos isn't importable, ToS acceptance is None."""
-    mocker.patch("conda_anaconda_telemetry.otel.get_local_metadata", None)
-
-    assert tos_are_accepted("defaults") is None
-
-
-def test_tos_are_accepted_no_local_record(mocker: MockerFixture) -> None:
-    """When the channel has no local ToS record, ToS acceptance is None."""
-
-    class _FakeMissingError(Exception):
-        pass
-
-    mocker.patch(
-        "conda_anaconda_telemetry.otel.CondaToSMissingError", _FakeMissingError
-    )
-    mocker.patch(
-        "conda_anaconda_telemetry.otel.get_local_metadata",
-        mocker.MagicMock(side_effect=_FakeMissingError("no record")),
-    )
-
-    assert tos_are_accepted("main-x") is None
+@pytest.mark.parametrize(
+    "specs,expected",
+    [
+        (["python >=3.11", "conda-forge::numpy"], ["numpy", "python"]),
+        (["numpy", "numpy=1.0"], ["numpy"]),
+    ],
+)
+def test_package_names_normalizes_specs(specs: list[str], expected: list[str]) -> None:
+    """Strip version constraints and channel qualifiers, and dedupe names."""
+    assert package_names(specs) == expected
 
 
-def test_tos_are_accepted_permission_error(mocker: MockerFixture) -> None:
-    """A permission error reading local ToS metadata means ToS acceptance is None."""
-
-    class _FakeMissingError(Exception):
-        pass
-
-    class _FakePermissionError(Exception):
-        pass
-
-    mocker.patch(
-        "conda_anaconda_telemetry.otel.CondaToSMissingError", _FakeMissingError
-    )
-    mocker.patch(
-        "conda_anaconda_telemetry.otel.CondaToSPermissionError", _FakePermissionError
-    )
-    mocker.patch(
-        "conda_anaconda_telemetry.otel.get_local_metadata",
-        mocker.MagicMock(side_effect=_FakePermissionError("permission denied")),
-    )
-
-    assert tos_are_accepted("main-x") is None
-
-
-def test_tos_are_accepted_real_record(mocker: MockerFixture) -> None:
-    """When a local ToS record exists, its tos_accepted value is returned."""
-    fake_pair = mocker.MagicMock()
-    fake_pair.metadata.tos_accepted = True
-    mocker.patch(
-        "conda_anaconda_telemetry.otel.get_local_metadata",
-        mocker.MagicMock(return_value=fake_pair),
-    )
-
-    assert tos_are_accepted("main-x") is True
+@pytest.mark.parametrize(
+    "specs",
+    [
+        # explicit package URL
+        ["https://repo.anaconda.com/pkgs/main/linux-64/numpy-1.0-py38_0.tar.bz2"],
+        # no exact name (wildcard)
+        ["*"],
+        # unparseable spec
+        ["==invalid==spec=="],
+    ],
+)
+def test_package_names_none_when_not_representable(specs: list[str]) -> None:
+    """Return None when a spec can't be reduced to an exact package name."""
+    assert package_names(specs) is None
 
 
 def test_get_install_attributes(mocker: MockerFixture) -> None:
@@ -198,7 +167,6 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
             channel_priority="strict",
         ),
     )
-    mocker.patch("conda_anaconda_telemetry.otel.tos_are_accepted", return_value=True)
 
     event = SimpleNamespace(
         exc_type=PackagesNotFoundError,
@@ -211,8 +179,8 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
         "event.schema_version": "1",
         "install.condarc.channels": json.dumps(
             [
-                {"channel": "defaults", "tos_accepted": True},
-                {"channel": "main-x", "tos_accepted": True},
+                {"channel": "defaults"},
+                {"channel": "main-x"},
             ]
         ),
         "install.condarc.channel_priority": "strict",
@@ -275,7 +243,6 @@ def test_get_install_attributes_truncation(
             channel_priority="strict",
         ),
     )
-    mocker.patch("conda_anaconda_telemetry.otel.tos_are_accepted", return_value=True)
 
     event = SimpleNamespace(
         exc_type=PackagesNotFoundError,
