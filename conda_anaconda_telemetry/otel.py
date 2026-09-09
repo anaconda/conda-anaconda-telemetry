@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -16,23 +17,14 @@ import anaconda_opentelemetry.signals as sig
 from anaconda_opentelemetry.attributes import ResourceAttributes
 from anaconda_opentelemetry.config import Configuration
 from conda.base.context import context
+from conda.exceptions import InvalidMatchSpec
+from conda.models.match_spec import MatchSpec
 
 from conda_anaconda_telemetry import APP_NAME, APP_VERSION
 from conda_anaconda_telemetry.resource_attributes import (
     get_conda_attributes,
     get_installer_attributes,
 )
-
-try:
-    from conda_anaconda_tos.exceptions import (
-        CondaToSMissingError,
-        CondaToSPermissionError,
-    )
-    from conda_anaconda_tos.local import get_local_metadata
-except ImportError:
-    get_local_metadata = None
-    CondaToSMissingError = None
-    CondaToSPermissionError = None
 
 if TYPE_CHECKING:
     from typing import Any
@@ -155,21 +147,25 @@ class AnacondaTelemetry:
             logger.debug("Event log failed to send.")
 
 
-def tos_are_accepted(channel: str) -> bool | None:
-    """Return whether channel's Terms of Service have been accepted.
+def package_names(specs: list[Any]) -> list[str] | None:
+    """Return exact names, or None when the request cannot be represented."""
+    names = set()
+    for value in specs:
+        try:
+            spec = MatchSpec(value)
+        except InvalidMatchSpec:
+            return None
 
-    Returns None if conda-anaconda-tos is not installed, or if the channel
-    has no local Terms of Service record at all.
-    """
-    if get_local_metadata is None:
-        return None
-    try:
-        return get_local_metadata(channel).metadata.tos_accepted
-    except CondaToSMissingError:
-        # TODO: Discuss what action to take if no ToS record exists
-        return None
-    except CondaToSPermissionError:
-        return None
+        name = spec.get_exact_value("name")
+        if (
+            spec.get_raw_value("url")
+            or not name
+            or not re.fullmatch(r"[a-z0-9_.-]+", name)
+        ):
+            return None
+        names.add(name)
+
+    return sorted(names)
 
 
 def _truncate(
@@ -199,10 +195,7 @@ def get_install_attributes(event: CondaExceptionEvent) -> dict[str, Any]:
     # context.channels is the fully merged channel list (CLI + condarc +
     # defaults); contrast with install.overrides below.
     channels, channels_truncated = _truncate(
-        [
-            {"channel": channel, "tos_accepted": tos_are_accepted(channel)}
-            for channel in context.channels
-        ]
+        [{"channel": channel} for channel in context.channels]
     )
     # This invocation's -c/--channel overrides, not the merged channel list.
     overrides, overrides_truncated = _truncate(list(argparse_args.channel or []))
