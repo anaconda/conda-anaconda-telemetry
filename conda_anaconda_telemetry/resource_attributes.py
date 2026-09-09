@@ -51,10 +51,9 @@ def get_conda_attributes() -> dict[str, str]:
     ``os.version``, are not gathered here since ``ResourceAttributes``
     already supplies them.
 
-    Non-string values must be JSON-encoded before being returned:
-    ``ResourceAttributes.set_attributes()`` stores wildcard values via
-    ``str()``, not ``json.dumps()``, which would otherwise produce Python's
-    ``repr()`` instead of valid JSON.
+    Boolean values are JSON-encoded because ``ResourceAttributes.__setattr__()``
+    converts dynamic scalar attributes with ``str()``, which would otherwise
+    produce ``True`` or ``False`` instead of valid JSON.
     """
     return {
         "conda.version": conda_version,
