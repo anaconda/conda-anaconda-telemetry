@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
-import json
 import platform
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -15,6 +14,7 @@ from conda.exceptions import PackagesNotFoundError
 from conda_anaconda_telemetry.otel import (
     LIST_BYTE_LIMIT,
     LIST_ITEM_LIMIT,
+    OTHER_CHANNEL_LABEL,
     AnacondaTelemetry,
     get_install_attributes,
     package_names,
@@ -151,46 +151,45 @@ def test_package_names_none_when_not_representable(specs: list[str]) -> None:
 
 
 def test_get_install_attributes(mocker: MockerFixture) -> None:
-    """All install.* keys are assembled from context / argparse args."""
-    argparse_args = SimpleNamespace(
-        cmd="install",
-        override_channels=False,
-        channel_priority="strict",
-        channel=["conda-forge", "foobar"],
-        packages=["pkg_foo", "defaults::pkg_bar"],
-    )
+    """All install.* keys are assembled from the event and the captured request."""
     mocker.patch(
         "conda_anaconda_telemetry.otel.context",
-        mocker.MagicMock(
-            _argparse_args=argparse_args,
-            channels=("defaults", "main-x"),
-            channel_priority="strict",
-        ),
+        mocker.MagicMock(channel_priority="strict"),
     )
 
     event = SimpleNamespace(
         exc_type=PackagesNotFoundError,
         exc_value=SimpleNamespace(packages=("pkg_foo",)),
+        channels=("defaults", "main-x", "some-private-channel"),
     )
-    attributes = get_install_attributes(event)
+    attributes = get_install_attributes(
+        event, command="install", requested_names=["pkg_foo", "pkg_bar"]
+    )
 
     assert attributes == {
         "command": "install",
         "event.schema_version": "1",
-        "install.condarc.channels": json.dumps(
-            [
-                {"channel": "defaults"},
-                {"channel": "main-x"},
-            ]
-        ),
-        "install.condarc.channel_priority": "strict",
-        "install.override_channels": False,
-        "install.cli.channels": ["conda-forge", "foobar"],
-        "requested.packages": ["pkg_foo", "defaults::pkg_bar"],
+        "install.channels": ["defaults", "main-x", OTHER_CHANNEL_LABEL],
+        "install.channel_priority": "strict",
+        "requested.packages": ["pkg_foo", "pkg_bar"],
         "exception.name": "PackagesNotFoundError",
         "exception.missing_specs": ["pkg_foo"],
         "truncated": False,
     }
+
+
+def test_get_install_attributes_cant_normalize() -> None:
+    """The event is skipped when the exception's specs can't be normalized."""
+    event = SimpleNamespace(
+        exc_type=PackagesNotFoundError,
+        exc_value=SimpleNamespace(packages=("*",)),
+        channels=(),
+    )
+
+    assert (
+        get_install_attributes(event, command="install", requested_names=["pkg_foo"])
+        is None
+    )
 
 
 @pytest.mark.parametrize(
@@ -227,28 +226,21 @@ def test_get_install_attributes_truncation(
     expected_kept: list[str],
     expected_truncated: bool,
 ) -> None:
-    """install.packages is capped by item count and by serialized byte size."""
-    argparse_args = SimpleNamespace(
-        cmd="install",
-        override_channels=False,
-        channel_priority="strict",
-        channel=[],
-        packages=packages,
-    )
+    """requested.packages is capped by item count and by serialized byte size."""
     mocker.patch(
         "conda_anaconda_telemetry.otel.context",
-        mocker.MagicMock(
-            _argparse_args=argparse_args,
-            channels=(),
-            channel_priority="strict",
-        ),
+        mocker.MagicMock(channel_priority="strict"),
     )
 
     event = SimpleNamespace(
         exc_type=PackagesNotFoundError,
         exc_value=SimpleNamespace(packages=()),
+        channels=(),
     )
-    attributes = get_install_attributes(event)
+    attributes = get_install_attributes(
+        event, command="install", requested_names=packages
+    )
 
+    assert attributes is not None
     assert attributes["requested.packages"] == expected_kept
     assert attributes["truncated"] == expected_truncated
