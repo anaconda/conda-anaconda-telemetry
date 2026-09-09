@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
+import logging
 import platform
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -160,7 +161,13 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
     event = SimpleNamespace(
         exc_type=PackagesNotFoundError,
         exc_value=SimpleNamespace(packages=("pkg_foo",)),
-        channels=("defaults", "main-x", "some-private-channel"),
+        channels=(
+            "defaults",
+            "main",
+            "main-x",
+            "conda-forge",
+            "some-private-channel",
+        ),
     )
     attributes = get_install_attributes(
         event, command="install", requested_names=["pkg_foo", "pkg_bar"]
@@ -169,7 +176,13 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
     assert attributes == {
         "command": "install",
         "event.schema_version": "1",
-        "install.channels": ["defaults", "main-x", OTHER_CHANNEL_LABEL],
+        "install.channels": [
+            "defaults",
+            "main",
+            "main-x",
+            "conda-forge",
+            OTHER_CHANNEL_LABEL,
+        ],
         "install.channel_priority": "strict",
         "requested.packages": ["pkg_foo", "pkg_bar"],
         "exception.name": "PackagesNotFoundError",
@@ -178,8 +191,11 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
     }
 
 
-def test_get_install_attributes_cant_normalize() -> None:
+def test_get_install_attributes_cant_normalize(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """The event is skipped when the exception's specs can't be normalized."""
+    caplog.set_level(logging.DEBUG, logger="conda_anaconda_telemetry.otel")
     event = SimpleNamespace(
         exc_type=PackagesNotFoundError,
         exc_value=SimpleNamespace(packages=("*",)),
@@ -190,6 +206,10 @@ def test_get_install_attributes_cant_normalize() -> None:
         get_install_attributes(event, command="install", requested_names=["pkg_foo"])
         is None
     )
+    assert caplog.messages == [
+        "Skipping telemetry because package names could not be read."
+    ]
+    assert "*" not in caplog.text
 
 
 @pytest.mark.parametrize(
