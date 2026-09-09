@@ -43,6 +43,12 @@ LIST_ITEM_LIMIT = 50
 #: Placeholder UTF-8 byte limit for list-valued event attributes.
 LIST_BYTE_LIMIT = 500
 
+#: Channel names allowed in the install.channels payload; anything else is
+#: reported as OTHER_CHANNEL_LABEL so a channel URL or internal name can't
+#: reach the payload.
+KNOWN_INSTALL_CHANNELS = frozenset({"defaults", "main-x"})
+OTHER_CHANNEL_LABEL = "other"
+
 
 class Environment(Enum):
     """Environment enum."""
@@ -188,35 +194,35 @@ def _truncate(
     return kept, truncated
 
 
-def get_install_attributes(event: CondaExceptionEvent) -> dict[str, Any]:
-    """Gather event attributes for the install-command PackagesNotFoundError signal."""
-    argparse_args = context._argparse_args
+def get_install_attributes(
+    event: CondaExceptionEvent,
+    *,
+    command: str,
+    requested_names: list[str],
+) -> dict[str, Any] | None:
+    """Build the event from captured package names and the failure snapshot."""
+    missing_names = package_names(list(event.exc_value.packages))
+    if missing_names is None:
+        return None
 
-    # context.channels is the fully merged channel list (CLI + condarc +
-    # defaults); contrast with install.overrides below.
     channels, channels_truncated = _truncate(
-        [{"channel": channel} for channel in context.channels]
+        [
+            channel if channel in KNOWN_INSTALL_CHANNELS else OTHER_CHANNEL_LABEL
+            for channel in event.channels or ()
+        ]
     )
-    # This invocation's -c/--channel overrides, not the merged channel list.
-    overrides, overrides_truncated = _truncate(list(argparse_args.channel or []))
-    packages, packages_truncated = _truncate(list(argparse_args.packages or []))
-    missing_specs, missing_specs_truncated = _truncate(
-        [str(spec) for spec in event.exc_value.packages]
-    )
+    packages, packages_truncated = _truncate(requested_names)
+    missing_specs, missing_specs_truncated = _truncate(missing_names)
 
     return {
-        "command": argparse_args.cmd,
+        "command": command,
         "event.schema_version": SIGNAL_VERSION,
-        # JSON-encoded because OTel attributes can't hold a list of dicts.
-        "install.condarc.channels": json.dumps(channels),
-        "install.condarc.channel_priority": str(context.channel_priority),
-        "install.override_channels": bool(argparse_args.override_channels),
-        "install.cli.channels": overrides,
+        "install.channels": channels,
+        "install.channel_priority": str(context.channel_priority),
         "requested.packages": packages,
         "exception.name": event.exc_type.__name__,
         "exception.missing_specs": missing_specs,
         "truncated": channels_truncated
-        or overrides_truncated
         or packages_truncated
         or missing_specs_truncated,
     }

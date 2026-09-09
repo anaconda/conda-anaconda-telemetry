@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING
 
 from conda.base.context import context
 
-from conda_anaconda_telemetry.otel import AnacondaTelemetry, get_install_attributes
+from conda_anaconda_telemetry.otel import (
+    AnacondaTelemetry,
+    get_install_attributes,
+    package_names,
+)
 
 if TYPE_CHECKING:
     from conda.plugins.types import (
@@ -27,6 +31,9 @@ def report_error(event: CondaExceptionEvent) -> None:
         # Only send telemetry during install command
         if conda_command != "install":
             return
+        requested_names = package_names(list(context._argparse_args.packages or []))
+        if requested_names is None:
+            return
         try:
             telemetry = AnacondaTelemetry()
             telemetry.initialize()
@@ -36,9 +43,13 @@ def report_error(event: CondaExceptionEvent) -> None:
             )
             return
         try:
+            attributes = get_install_attributes(
+                event, command=conda_command, requested_names=requested_names
+            )
+            if attributes is None:
+                return
             # anaconda-client's telemetry event naming convention
             event_name = f"{conda_command}.pnfe"
-            attributes = get_install_attributes(event)
             telemetry.send_event(event_name, "", attributes)
         except Exception as e:
             logger.debug("Failed to send telemetry for %s", event.exc_type, exc_info=e)

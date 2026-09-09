@@ -112,6 +112,48 @@ def test_report_error_non_install_command(
     telemetry_cls.assert_not_called()
 
 
+def test_report_error_unrepresentable_packages_skipped(
+    plugin_manager: CondaPluginManagerType, mocker: MockerFixture
+) -> None:
+    """Telemetry is skipped when the requested packages can't be normalized."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context._argparse_args",
+        mocker.MagicMock(cmd="install", packages=["*"]),
+    )
+    telemetry_cls = mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
+
+    raise_and_dispatch(plugin_manager, PackagesNotFoundError(["numpy"]))
+
+    telemetry_cls.assert_not_called()
+
+
+def test_report_error_missing_attributes_skipped(
+    plugin_manager: CondaPluginManagerType, mocker: MockerFixture
+) -> None:
+    """Telemetry is skipped when get_install_attributes() returns None."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context._argparse_args",
+        mocker.MagicMock(cmd="install", packages=["numpy"]),
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.get_install_attributes", return_value=None
+    )
+    telemetry = mocker.MagicMock()
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
+    )
+
+    raise_and_dispatch(plugin_manager, PackagesNotFoundError(["numpy"]))
+
+    telemetry.send_event.assert_not_called()
+
+
 def test_report_error_happy_path(
     plugin_manager: CondaPluginManagerType,
     mocker: MockerFixture,
@@ -123,7 +165,7 @@ def test_report_error_happy_path(
     )
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context._argparse_args",
-        mocker.MagicMock(cmd="install"),
+        mocker.MagicMock(cmd="install", packages=["numpy"]),
     )
     telemetry = mocker.MagicMock()
     telemetry_cls = mocker.patch(
@@ -151,7 +193,7 @@ def test_report_error_initialize_failure_is_consumed(mocker: MockerFixture) -> N
     )
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context._argparse_args",
-        mocker.MagicMock(cmd="install"),
+        mocker.MagicMock(cmd="install", packages=["numpy"]),
     )
     telemetry = mocker.MagicMock()
     telemetry.initialize.side_effect = RuntimeError("boom")
@@ -195,7 +237,7 @@ def test_report_error_signal_payload_baseline(
     )
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context._argparse_args",
-        mocker.MagicMock(cmd="install"),
+        mocker.MagicMock(cmd="install", packages=["numpy"]),
     )
     mock_initialize = mocker.patch(
         "conda_anaconda_telemetry.otel.sig.initialize_telemetry"
@@ -259,7 +301,7 @@ def test_report_error_send_event_failure_is_consumed(
     )
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context._argparse_args",
-        mocker.MagicMock(cmd="install"),
+        mocker.MagicMock(cmd="install", packages=["numpy"]),
     )
     telemetry = mocker.MagicMock()
     telemetry.send_event.side_effect = RuntimeError("boom")
