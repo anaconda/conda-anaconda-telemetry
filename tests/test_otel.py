@@ -7,11 +7,10 @@ import pytest
 
 from conda_anaconda_telemetry.otel import AnacondaTelemetry
 
-# The three endpoints AnacondaTelemetry actually hardcodes per environment.
+# The two hardcoded endpoints
 DUMMY_ENDPOINT = "http://localhost:4318"
 PRODUCTION_ENDPOINT = "https://public.telemetry.anaconda.com/v1/logs"
-STAGING_ENDPOINT = "https://metrics.stage.anacondaconnect.com/v1/logs"
-# Made-up values standing in for an attacker/trusted endpoint or proxy, not real.
+# Fake endpoints/proxies.
 ATTACKER_ENDPOINT = "https://attacker.example.com:1234/v1/logs"
 ATTACKER_PROXY = "http://attacker-proxy.example.com:1234"
 TRUSTED_PROXY = "http://trusted-proxy.example.com:1234"
@@ -21,7 +20,7 @@ TRUSTED_PROXY = "http://trusted-proxy.example.com:1234"
     "environment, default_endpoint",
     [
         ("production", PRODUCTION_ENDPOINT),
-        ("staging", STAGING_ENDPOINT),
+        ("staging", PRODUCTION_ENDPOINT),
         ("test", DUMMY_ENDPOINT),
         ("development", DUMMY_ENDPOINT),
         ("", PRODUCTION_ENDPOINT),
@@ -68,11 +67,12 @@ def test_atel_default_endpoint_falls_through_for_untrusted_values(
     ignored, falling through to the fixed default_endpoint, instead of
     raising or letting it redirect telemetry to an arbitrary host.
     """
+    monkeypatch.setenv("ATEL_ENVIRONMENT", "production")
     monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", default_endpoint)
 
     telemetry = AnacondaTelemetry()
 
-    assert telemetry.default_endpoint == DUMMY_ENDPOINT
+    assert telemetry.default_endpoint == PRODUCTION_ENDPOINT
 
 
 @pytest.mark.parametrize(
@@ -97,6 +97,38 @@ def test_make_config(
     assert config._get_console_exporter() is expected
 
 
+def test_atel_default_endpoint_env_var_does_not_override_probe_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ATEL_DEFAULT_ENDPOINT must not redirect the SDK's internet-connectivity
+    check to an attacker's host.
+    """
+    monkeypatch.setenv("ATEL_ENVIRONMENT", "production")
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", ATTACKER_ENDPOINT)
+
+    telemetry = AnacondaTelemetry()
+    config = telemetry._make_config()
+
+    assert config._get_default_endpoint() == PRODUCTION_ENDPOINT
+    assert config._endpoints["default_endpoint"].host == "public.telemetry.anaconda.com"
+
+
+@pytest.mark.parametrize(
+    "default_endpoint",
+    [DUMMY_ENDPOINT, "http://127.0.0.1:4318"],
+)
+def test_make_config_loopback_forms_behave_the_same(
+    monkeypatch: pytest.MonkeyPatch, default_endpoint: str
+) -> None:
+    """localhost and 127.0.0.1 should be treated the same way."""
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", default_endpoint)
+
+    config = AnacondaTelemetry()._make_config()
+
+    assert config._get_console_exporter() is True
+    assert config._get_skip_internet_check() is True
+
+
 def test_atel_logging_endpoint_env_var_does_not_override_pinned_endpoint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -118,7 +150,7 @@ def test_atel_logging_endpoint_env_var_does_not_override_pinned_endpoint(
     "environment, expected_default_endpoint",
     [
         ("production", PRODUCTION_ENDPOINT),
-        ("staging", STAGING_ENDPOINT),
+        ("staging", PRODUCTION_ENDPOINT),
         ("test", DUMMY_ENDPOINT),
         ("development", DUMMY_ENDPOINT),
         ("", PRODUCTION_ENDPOINT),
@@ -162,8 +194,8 @@ def test_auth_token_env_vars_are_neutralized(
     "proxy_servers,expected_proxy_url",
     [
         ({}, None),
-        ({"http": TRUSTED_PROXY}, TRUSTED_PROXY),
-        ({"http://localhost": TRUSTED_PROXY}, TRUSTED_PROXY),
+        ({"https": TRUSTED_PROXY}, TRUSTED_PROXY),
+        ({"https://public.telemetry.anaconda.com": TRUSTED_PROXY}, TRUSTED_PROXY),
     ],
 )
 def test_proxy_url_comes_from_conda_not_atel_proxy_url(
@@ -171,13 +203,13 @@ def test_proxy_url_comes_from_conda_not_atel_proxy_url(
     proxy_servers: dict[str, str],
     expected_proxy_url: str | None,
 ) -> None:
-    """The resolved proxy must always come from conda's own proxy_servers
-    config (bare scheme, scheme://host, or none configured), never from an
-    attacker-controlled ATEL_PROXY_URL, which is read directly by
-    Configuration.__init__.
+    """The proxy must come from conda's own settings, never from
+    ATEL_PROXY_URL. Pins ATEL_ENVIRONMENT=production so the test doesn't
+    rely on CI's global ATEL_ENVIRONMENT=test env var to pass.
     """
     from conda.base.context import context
 
+    monkeypatch.setenv("ATEL_ENVIRONMENT", "production")
     monkeypatch.setenv("ATEL_PROXY_URL", ATTACKER_PROXY)
     monkeypatch.setitem(context._cache_, "proxy_servers", proxy_servers)
 
