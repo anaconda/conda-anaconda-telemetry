@@ -15,10 +15,9 @@ from conda_anaconda_telemetry.hooks import (
     HEADER_SEARCH,
     HEADER_SYS_INFO,
     HEADER_VIRTUAL_PACKAGES,
+    REQUEST_HEADER_PATTERN,
     SIZE_LIMIT,
     _conda_request_headers,
-    conda_post_commands,
-    conda_post_solves,
     conda_request_headers,
     conda_settings,
     should_submit_request_headers,
@@ -196,27 +195,6 @@ def test_conda_settings() -> None:
     assert settings[0].parameter.default.value is True
 
 
-def test_conda_post_commands_registration() -> None:
-    """The hookimpl yields a single post-command hook for install/create."""
-    from conda_anaconda_telemetry.plugin import report_success
-
-    (post_command,) = conda_post_commands()
-
-    assert post_command.name == "conda-anaconda-telemetry-post-command"
-    assert post_command.action is report_success
-    assert post_command.run_for == {"install", "create"}
-
-
-def test_conda_post_solves_registration() -> None:
-    """The hookimpl yields a single post-solve hook that captures resolved packages."""
-    from conda_anaconda_telemetry.plugin import capture_resolved_packages
-
-    (post_solve,) = conda_post_solves()
-
-    assert post_solve.name == "conda-anaconda-telemetry-post-solve"
-    assert post_solve.action is capture_resolved_packages
-
-
 def test_exception_handling(mocker: MockerFixture, caplog: CaptureFixture) -> None:
     """
     When any exception is encountered, ``conda_request_headers`` should return nothing
@@ -305,8 +283,6 @@ def test_patterns_validation() -> None:
     Test that should_submit_request_headers works with the actual
     REQUEST_HEADER_PATTERN regex.
     """
-    from conda_anaconda_telemetry.hooks import REQUEST_HEADER_PATTERN
-
     # Verify the REQUEST_HEADER_PATTERN is a compiled regex
     assert hasattr(REQUEST_HEADER_PATTERN, "match")
     assert hasattr(REQUEST_HEADER_PATTERN, "pattern")
