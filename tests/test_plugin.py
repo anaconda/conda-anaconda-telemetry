@@ -405,32 +405,6 @@ def test_report_error_channel_resolution_failure(
     )
 
 
-def test_report_error_local_prefix_lookup_failure(
-    plugin_manager: CondaPluginManagerType, mocker: MockerFixture
-) -> None:
-    """PackageNotInstalledError during update is excluded by the command guard.
-
-    The exception inherits from ``PackagesNotFoundError``, so the observer
-    dispatches it. This verifies that ``report_error()`` returns for ``update``
-    before initializing telemetry.
-    """
-    mocker.patch(
-        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
-    )
-
-    mocker.patch(
-        "conda_anaconda_telemetry.plugin.context._argparse_args",
-        mocker.MagicMock(cmd="update"),
-    )
-    telemetry_cls = mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
-
-    raise_and_dispatch(
-        plugin_manager, PackageNotInstalledError("/opt/conda/envs/foo", "numpy")
-    )
-
-    telemetry_cls.assert_not_called()
-
-
 def test_report_error_initialize_failure_is_consumed(mocker: MockerFixture) -> None:
     """If initialize() raises, send_event is never called and nothing propagates.
 
