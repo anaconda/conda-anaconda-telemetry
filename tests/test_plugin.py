@@ -388,10 +388,7 @@ def test_report_error_channel_resolution_failure(
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
-    mocker.patch(
-        "conda_anaconda_telemetry.plugin.context._argparse_args",
-        mocker.MagicMock(cmd="install"),
-    )
+    capture_install_request(plugin_manager, ["numpy"])
     telemetry = mocker.MagicMock()
     telemetry_cls = mocker.patch(
         "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
