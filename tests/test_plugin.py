@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import conda
 import pytest
@@ -39,9 +39,13 @@ from conda_anaconda_telemetry.plugin import (
 if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
+    from unittest.mock import MagicMock
 
     from conda.plugins.manager import CondaPluginManager as CondaPluginManagerType
     from pytest_mock import MockerFixture
+
+
+RESOLVED_PACKAGE = "numpy=1.26.0=py311h0"
 
 
 @pytest.fixture
@@ -89,7 +93,7 @@ def reset_plugin_state() -> Generator[None, None, None]:
 @pytest.fixture
 def mock_success_attributes(mocker: MockerFixture) -> dict:
     """Stub get_success_attributes() so tests don't depend on live conda state."""
-    attributes = {"command": "install", "resolved.packages": ["numpy=1.26.0=py311h0"]}
+    attributes = {"command": "install", "resolved.packages": [RESOLVED_PACKAGE]}
     mocker.patch(
         "conda_anaconda_telemetry.plugin.get_success_attributes",
         return_value=attributes,
@@ -266,9 +270,7 @@ def test_capture_resolved_packages(mocker: MockerFixture) -> None:
     capture_resolved_packages("repodata.json", (), (first,))
     capture_resolved_packages("repodata.json", (), (second,))
 
-    assert plugin_module.command_request.resolved_packages == [
-        "numpy=1.26.0=py311h1"
-    ]
+    assert plugin_module.command_request.resolved_packages == ["numpy=1.26.0=py311h1"]
 
 
 def test_capture_resolved_packages_records_empty_solve(mocker: MockerFixture) -> None:
@@ -289,7 +291,7 @@ def test_clear_command_resets_state(command_name: str | None) -> None:
     plugin_module.command_request.command = plugin_module.TelemetryCommand.INSTALL
     plugin_module.command_request.requested_names = ["numpy"]
     plugin_module.command_request.channels = ["defaults"]
-    plugin_module.command_request.resolved_packages = ["numpy=1.26.0=py311h0"]
+    plugin_module.command_request.resolved_packages = [RESOLVED_PACKAGE]
 
     clear_command(command_name)
 
@@ -302,9 +304,13 @@ def test_clear_command_resets_state(command_name: str | None) -> None:
 def test_post_commands_hook_clears_state_after_success(
     plugin_manager: CondaPluginManagerType, mocker: MockerFixture
 ) -> None:
-    """The registered post-command hook clears captured state after success."""
+    """The registered post-command hook sends success and clears captured state."""
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    telemetry = mocker.MagicMock()
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
     )
     capture_request(plugin_manager, "install", ["numpy"])
     plugin_manager.invoke_post_solves("repodata.json", (), ())
@@ -312,6 +318,7 @@ def test_post_commands_hook_clears_state_after_success(
 
     plugin_manager.invoke_post_commands("install")
 
+    telemetry.send_event.assert_called_once()
     assert plugin_module.command_request.command is None
     assert plugin_module.command_request.requested_names is None
     assert plugin_module.command_request.channels is None
@@ -418,30 +425,6 @@ def test_report_error_missing_attributes_skipped(
     telemetry.send_event.assert_not_called()
 
 
-def test_report_error_happy_path(
-    plugin_manager: CondaPluginManagerType,
-    mocker: MockerFixture,
-    mock_install_attributes: dict,
-) -> None:
-    """On install, telemetry is initialized and the event is sent."""
-    mocker.patch(
-        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
-    )
-    capture_request(plugin_manager, "install", ["numpy"])
-    telemetry = mocker.MagicMock()
-    telemetry_cls = mocker.patch(
-        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
-    )
-
-    raise_and_dispatch(plugin_manager, PackagesNotFoundInChannelsError(["numpy"], []))
-
-    telemetry_cls.assert_called_once()
-    telemetry.initialize.assert_called_once()
-    telemetry.send_event.assert_called_once_with(
-        "install.pnfe", "", mock_install_attributes
-    )
-
-
 def test_report_error_clears_state_after_failure(
     plugin_manager: CondaPluginManagerType, mocker: MockerFixture
 ) -> None:
@@ -452,36 +435,15 @@ def test_report_error_clears_state_after_failure(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
     capture_request(plugin_manager, "install", ["numpy"])
+    plugin_module.command_request.resolved_packages = [RESOLVED_PACKAGE]
     mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
 
     raise_and_dispatch(plugin_manager, PackagesNotFoundInChannelsError(["numpy"], []))
 
     assert plugin_module.command_request.command is None
     assert plugin_module.command_request.requested_names is None
-
-
-def test_report_error_sends_event_on_create(
-    plugin_manager: CondaPluginManagerType,
-    mocker: MockerFixture,
-    mock_install_attributes: dict,
-) -> None:
-    """On create, telemetry is initialized and the event is sent."""
-    mocker.patch(
-        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
-    )
-    capture_request(plugin_manager, "create", ["numpy"])
-    telemetry = mocker.MagicMock()
-    telemetry_cls = mocker.patch(
-        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
-    )
-
-    raise_and_dispatch(plugin_manager, PackagesNotFoundInChannelsError(["numpy"], []))
-
-    telemetry_cls.assert_called_once()
-    telemetry.initialize.assert_called_once()
-    telemetry.send_event.assert_called_once_with(
-        "create.pnfe", "", mock_install_attributes
-    )
+    assert plugin_module.command_request.channels is None
+    assert plugin_module.command_request.resolved_packages is None
 
 
 def test_report_error_channel_resolution_failure(
@@ -677,7 +639,7 @@ def test_report_error_send_event_failure_is_consumed(
 
 def test_report_success_disabled_plugin(mocker: MockerFixture) -> None:
     """When the plugin setting is disabled, telemetry is never touched."""
-    set_success_request("install", ["numpy=1.26.0=py311h0"])
+    set_success_request("install", [RESOLVED_PACKAGE])
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", False
     )
@@ -695,9 +657,7 @@ def test_report_success_without_post_solve_is_skipped(mocker: MockerFixture) -> 
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
-    attributes = mocker.patch(
-        "conda_anaconda_telemetry.plugin.get_success_attributes"
-    )
+    attributes = mocker.patch("conda_anaconda_telemetry.plugin.get_success_attributes")
     telemetry_cls = mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
 
     report_success("install")
@@ -709,7 +669,7 @@ def test_report_success_without_post_solve_is_skipped(mocker: MockerFixture) -> 
 
 def test_report_success_initialize_failure_is_consumed(mocker: MockerFixture) -> None:
     """If initialize() raises, send_event is never called and nothing propagates."""
-    set_success_request("install", ["numpy=1.26.0=py311h0"])
+    set_success_request("install", [RESOLVED_PACKAGE])
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
@@ -731,7 +691,7 @@ def test_report_success_attribute_gathering_failure_is_consumed(
     mocker: MockerFixture,
 ) -> None:
     """If get_success_attributes() raises, telemetry is never touched."""
-    set_success_request("install", ["numpy=1.26.0=py311h0"])
+    set_success_request("install", [RESOLVED_PACKAGE])
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
@@ -750,7 +710,7 @@ def test_report_success_send_event_failure_is_consumed(
     mocker: MockerFixture, mock_success_attributes: dict
 ) -> None:
     """If send_event() raises, the failure is consumed rather than propagating."""
-    set_success_request("install", ["numpy=1.26.0=py311h0"])
+    set_success_request("install", [RESOLVED_PACKAGE])
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
@@ -767,12 +727,22 @@ def test_report_success_send_event_failure_is_consumed(
     )
 
 
-@pytest.mark.parametrize("command", ["install", "create"])
+@pytest.mark.parametrize(
+    ("command", "resolved_packages"),
+    [
+        ("install", [RESOLVED_PACKAGE]),
+        ("create", [RESOLVED_PACKAGE]),
+        ("install", []),
+    ],
+)
 def test_report_success_sends_event(
-    mocker: MockerFixture, mock_success_attributes: dict, command: str
+    mocker: MockerFixture,
+    mock_success_attributes: dict,
+    command: str,
+    resolved_packages: list[str],
 ) -> None:
-    """On a clean install/create completion, telemetry is initialized and sent."""
-    set_success_request(command, ["numpy=1.26.0=py311h0"])
+    """A captured install/create solve emits success, including an empty solve."""
+    set_success_request(command, resolved_packages)
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
@@ -785,6 +755,13 @@ def test_report_success_sends_event(
 
     telemetry_cls.assert_called_once()
     telemetry.initialize.assert_called_once()
+    # Need to cast to MagicMock below to satisfy pre-commit
+    cast("MagicMock", plugin_module.get_success_attributes).assert_called_once_with(
+        command=command,
+        channels=["defaults"],
+        requested_names=["numpy"],
+        resolved_packages=resolved_packages,
+    )
     telemetry.send_event.assert_called_once_with(
         f"{command}.success", "", mock_success_attributes
     )

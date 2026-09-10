@@ -64,7 +64,7 @@ def capture_command(command: str) -> None:
         return
     try:
         command_request.command = TelemetryCommand(command)
-        # Success events use the configured channels because they have no error snapshot.
+        # Success events use configured channels because no exception provides them.
         command_request.channels = list(context.channels)
     except ValueError:
         command_request.command = None
