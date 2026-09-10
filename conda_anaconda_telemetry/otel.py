@@ -12,8 +12,10 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import anaconda_opentelemetry.signals as sig
+import requests.utils
 from anaconda_opentelemetry.attributes import ResourceAttributes
 from anaconda_opentelemetry.config import Configuration
+from conda.base.context import context
 
 from conda_anaconda_telemetry import APP_NAME, APP_VERSION
 from conda_anaconda_telemetry.resource_attributes import (
@@ -55,31 +57,44 @@ class AnacondaTelemetry:
     def __post_init__(self) -> None:
         """Set the default endpoint based on the environment.
 
-        If ATEL_DEFAULT_ENDPOINT is set, it will be used instead.
+        ATEL_DEFAULT_ENDPOINT can only pick a local http collector for testing;
+        any other value is ignored. ATEL_ENVIRONMENT never selects a remote
+        endpoint other than production — it is a label only.
         """
-        default_endpoint = os.getenv("ATEL_DEFAULT_ENDPOINT")
-        if default_endpoint is not None:
-            self.default_endpoint = default_endpoint
-        elif self.environment.value == "staging":
-            self.default_endpoint = "https://metrics.stage.anacondaconnect.com/v1/logs"
-        elif self.environment.value in ("test", "development"):
+        if self.environment.value in ("test", "development"):
             self.default_endpoint = "http://localhost:4318"
         else:
             self.default_endpoint = "https://public.telemetry.anaconda.com/v1/logs"
 
-        parsed_endpoint = urlparse(self.default_endpoint)
-        if parsed_endpoint.scheme not in ("http", "https", "grpc"):
-            raise ValueError("A valid default endpoint must be set.")
-
-        if parsed_endpoint.scheme == "http" and parsed_endpoint.hostname not in (
-            "localhost",
-            "127.0.0.1",
-        ):
-            raise ValueError("A valid default endpoint must be set.")
+        default_endpoint = os.getenv("ATEL_DEFAULT_ENDPOINT")
+        if default_endpoint is not None:
+            parsed_endpoint = urlparse(default_endpoint)
+            if parsed_endpoint.scheme == "http" and parsed_endpoint.hostname in (
+                "localhost",
+                "127.0.0.1",
+            ):
+                self.default_endpoint = default_endpoint
 
     def _make_config(self) -> Configuration:
         config = Configuration(default_endpoint=self.default_endpoint)
-        if "localhost" in self.default_endpoint.lower():
+        # Temporary workaround: Configuration has no way to skip merging
+        # ATEL_* env vars, so the next few calls reset/override what it
+        # already merged in. Will be removed once anaconda_opentelemetry
+        # adds a supported way to opt out.
+        trusted_default = Configuration._Endpoint(self.default_endpoint)
+        config._config[Configuration.DEFAULT_ENDPOINT_NAME] = trusted_default.url
+        config._endpoints[Configuration.DEFAULT_ENDPOINT_NAME] = trusted_default
+        # Force our trusted endpoint back in, since the constructor above already
+        # let ATEL_LOGGING_ENDPOINT/ATEL_DEFAULT_ENDPOINT override it.
+        config.set_logging_endpoint(self.default_endpoint)
+        # set_auth_token_logging is deprecated with no non-deprecated
+        # replacement yet; will be removed per the workaround note above.
+        config.set_auth_token_logging(None)
+        # Use conda's own proxy config instead of ATEL_PROXY_URL.
+        config.set_proxy_url(
+            requests.utils.select_proxy(self.default_endpoint, context.proxy_servers)
+        )
+        if urlparse(self.default_endpoint).hostname in ("localhost", "127.0.0.1"):
             # Set the configuration for test and development
             config.set_skip_internet_check(True)
             config.set_console_exporter(True)

@@ -27,6 +27,7 @@ requirements:
     - conda >=26.5
     # require at least 1.2.2 for hashed hostnames
     - anaconda-opentelemetry >=1.2.2
+    - requests
 
 test:
   requires:
