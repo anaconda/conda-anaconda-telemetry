@@ -80,11 +80,10 @@ class AnacondaTelemetry:
         """Set the default endpoint based on the environment.
 
         ATEL_DEFAULT_ENDPOINT can only pick a local http collector for testing;
-        any other value is ignored.
+        any other value is ignored. ATEL_ENVIRONMENT never selects a remote
+        endpoint other than production — it is a label only.
         """
-        if self.environment.value == "staging":
-            self.default_endpoint = "https://metrics.stage.anacondaconnect.com/v1/logs"
-        elif self.environment.value in ("test", "development"):
+        if self.environment.value in ("test", "development"):
             self.default_endpoint = "http://localhost:4318"
         else:
             self.default_endpoint = "https://public.telemetry.anaconda.com/v1/logs"
@@ -108,7 +107,7 @@ class AnacondaTelemetry:
         config.set_proxy_url(
             requests.utils.select_proxy(self.default_endpoint, context.proxy_servers)
         )
-        if "localhost" in self.default_endpoint.lower():
+        if urlparse(self.default_endpoint).hostname in ("localhost", "127.0.0.1"):
             # Set the configuration for test and development
             config.set_skip_internet_check(True)
             config.set_console_exporter(True)

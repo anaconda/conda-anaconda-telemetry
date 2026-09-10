@@ -27,6 +27,7 @@ requirements:
     - conda >=26.5
     # require at least 1.2.4 to exclude hostname and disable session.id
     - anaconda-opentelemetry >=1.2.4
+    - requests
 
 test:
   requires:
