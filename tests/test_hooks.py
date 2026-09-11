@@ -15,6 +15,7 @@ from conda_anaconda_telemetry.hooks import (
     HEADER_SEARCH,
     HEADER_SYS_INFO,
     HEADER_VIRTUAL_PACKAGES,
+    REQUEST_HEADER_PATTERN,
     SIZE_LIMIT,
     _conda_request_headers,
     conda_request_headers,
@@ -282,8 +283,6 @@ def test_patterns_validation() -> None:
     Test that should_submit_request_headers works with the actual
     REQUEST_HEADER_PATTERN regex.
     """
-    from conda_anaconda_telemetry.hooks import REQUEST_HEADER_PATTERN
-
     # Verify the REQUEST_HEADER_PATTERN is a compiled regex
     assert hasattr(REQUEST_HEADER_PATTERN, "match")
     assert hasattr(REQUEST_HEADER_PATTERN, "pattern")

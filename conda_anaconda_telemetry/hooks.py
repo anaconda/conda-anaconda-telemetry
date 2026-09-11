@@ -19,6 +19,7 @@ from conda.plugins import CondaRequestHeader, CondaSetting, hookimpl
 from conda.plugins.types import (
     CondaExceptionObserver,
     CondaPostCommand,
+    CondaPostSolve,
     CondaPreCommand,
     CondaPreSolve,
 )
@@ -26,8 +27,9 @@ from conda.plugins.types import (
 from conda_anaconda_telemetry.plugin import (
     capture_command,
     capture_requested_packages,
-    clear_command,
+    capture_resolved_packages,
     report_error,
+    report_success,
 )
 
 try:
@@ -323,10 +325,10 @@ def conda_pre_solves() -> Iterator[CondaPreSolve]:
 
 @hookimpl
 def conda_post_commands() -> Iterator[CondaPostCommand]:
-    """Register clear_command() as a conda post-command hook."""
+    """Register success telemetry for supported commands."""
     yield CondaPostCommand(
         name="conda-anaconda-telemetry-post-command",
-        action=clear_command,
+        action=report_success,
         run_for={"create", "install"},
     )
 
@@ -340,4 +342,13 @@ def conda_exception_observers() -> Generator[CondaExceptionObserver, None, None]
         # We intentionally observe BaseException such
         # that report_error() can clear the captured state.
         watch_for={"BaseException"},
+    )
+
+
+@hookimpl
+def conda_post_solves() -> Iterator[CondaPostSolve]:
+    """Capture resolved packages for success telemetry."""
+    yield CondaPostSolve(
+        name="conda-anaconda-telemetry-post-solve",
+        action=capture_resolved_packages,
     )
