@@ -382,6 +382,32 @@ def test_report_error_clears_state_after_failure(
     assert plugin_module.command_request.requested_names is None
 
 
+def test_report_error_channel_resolution_failure(
+    plugin_manager: CondaPluginManagerType,
+    mocker: MockerFixture,
+    mock_install_attributes: dict,
+) -> None:
+    """A real channel-resolution failure during install sends telemetry."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    capture_install_request(plugin_manager, ["numpy"])
+    telemetry = mocker.MagicMock()
+    telemetry_cls = mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry", return_value=telemetry
+    )
+
+    raise_and_dispatch(
+        plugin_manager, PackagesNotFoundInChannelsError(["numpy"], ["main-x"])
+    )
+
+    telemetry_cls.assert_called_once()
+    telemetry.initialize.assert_called_once()
+    telemetry.send_event.assert_called_once_with(
+        "install.pnfe", "", mock_install_attributes
+    )
+
+
 def test_report_error_initialize_failure_is_consumed(mocker: MockerFixture) -> None:
     """If initialize() raises, send_event is never called and nothing propagates.
 
