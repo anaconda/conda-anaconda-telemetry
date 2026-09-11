@@ -370,6 +370,9 @@ def test_report_error_clears_state_after_failure(
     """Captured state is cleared after a failure, since post-command hooks
     don't run when the command fails.
     """
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
     capture_install_request(plugin_manager, ["numpy"])
     mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
 
