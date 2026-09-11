@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING
 
 import conda
 import pytest
-from conda.exceptions import PackageNotInstalledError, PackagesNotFoundInChannelsError
+from conda.exceptions import (
+    DryRunExit,
+    PackageNotInstalledError,
+    PackagesNotFoundInChannelsError,
+)
 from conda.models.match_spec import MatchSpec
 from conda.plugins.hookspec import CondaSpecs
 from conda.plugins.manager import CondaPluginManager
@@ -103,14 +107,12 @@ def capture_install_request(
 
 
 def test_conda_exception_observers_registration() -> None:
-    """The hookimpl watches for the channel-resolution
-    subclass PackagesNotFoundInChannelsError.
-    """
+    """The observer receives all exceptions so it can always clear state."""
     (observer,) = conda_exception_observers()
 
     assert observer.name == "conda-anaconda-telemetry"
     assert observer.hook is report_error
-    assert observer.watch_for == {"PackagesNotFoundInChannelsError"}
+    assert observer.watch_for == {"BaseException"}
 
 
 def test_conda_pre_commands_registration() -> None:
@@ -234,6 +236,23 @@ def test_post_commands_hook_clears_state_after_success(
 
     plugin_manager.invoke_post_commands("install")
 
+    assert plugin_module.command_request.command is None
+    assert plugin_module.command_request.requested_names is None
+
+
+def test_non_reportable_exception_clears_request(
+    plugin_manager: CondaPluginManagerType, mocker: MockerFixture
+) -> None:
+    """A non-reportable exception clears the captured install request."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    capture_install_request(plugin_manager, ["numpy"])
+    telemetry_cls = mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
+
+    raise_and_dispatch(plugin_manager, DryRunExit())
+
+    telemetry_cls.assert_not_called()
     assert plugin_module.command_request.command is None
     assert plugin_module.command_request.requested_names is None
 

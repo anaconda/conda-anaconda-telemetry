@@ -337,5 +337,7 @@ def conda_exception_observers() -> Generator[CondaExceptionObserver, None, None]
     yield CondaExceptionObserver(
         name="conda-anaconda-telemetry",
         hook=report_error,
-        watch_for={"PackagesNotFoundInChannelsError"},
+        # We intentionally observe BaseException such
+        # that report_error() can clear the captured state.
+        watch_for={"BaseException"},
     )
