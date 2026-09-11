@@ -146,6 +146,9 @@ def report_success(command: str) -> None:
     try:
         if not context.plugins.anaconda_telemetry:
             return
+        # These flags reach this hook when there is nothing left to install.
+        if context.dry_run or context.download_only:
+            return
         request = command_request
         if request.command is None or request.requested_names is None:
             return

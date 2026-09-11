@@ -667,6 +667,26 @@ def test_report_success_without_post_solve_is_skipped(mocker: MockerFixture) -> 
     assert plugin_module.command_request.command is None
 
 
+@pytest.mark.parametrize("flag", ["dry_run", "download_only"])
+def test_report_success_skipped_for_transactionless_flags(
+    mocker: MockerFixture, flag: str
+) -> None:
+    """A dry run or download-only command sends no success event."""
+    set_success_request("install", [])
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(f"conda_anaconda_telemetry.plugin.context.{flag}", True)
+    attributes = mocker.patch("conda_anaconda_telemetry.plugin.get_success_attributes")
+    telemetry_cls = mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
+
+    report_success("install")
+
+    attributes.assert_not_called()
+    telemetry_cls.assert_not_called()
+    assert plugin_module.command_request.command is None
+
+
 def test_report_success_initialize_failure_is_consumed(mocker: MockerFixture) -> None:
     """If initialize() raises, send_event is never called and nothing propagates."""
     set_success_request("install", [RESOLVED_PACKAGE])
