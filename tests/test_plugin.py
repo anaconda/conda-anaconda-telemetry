@@ -248,7 +248,7 @@ def test_non_reportable_exception_clears_request(
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
-    capture_install_request(plugin_manager, ["numpy"])
+    capture_request(plugin_manager, "install", ["numpy"])
     telemetry_cls = mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
 
     raise_and_dispatch(plugin_manager, DryRunExit())
@@ -371,6 +371,9 @@ def test_report_error_clears_state_after_failure(
     """Captured state is cleared after a failure, since post-command hooks
     don't run when the command fails.
     """
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
     capture_request(plugin_manager, "install", ["numpy"])
     mocker.patch("conda_anaconda_telemetry.plugin.AnacondaTelemetry")
 
