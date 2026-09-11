@@ -16,9 +16,19 @@ from conda.common.configuration import PrimitiveParameter
 from conda.common.url import mask_anaconda_token
 from conda.models.channel import all_channel_urls
 from conda.plugins import CondaRequestHeader, CondaSetting, hookimpl
-from conda.plugins.types import CondaExceptionObserver
+from conda.plugins.types import (
+    CondaExceptionObserver,
+    CondaPostCommand,
+    CondaPreCommand,
+    CondaPreSolve,
+)
 
-from conda_anaconda_telemetry.plugin import report_error
+from conda_anaconda_telemetry.plugin import (
+    capture_command,
+    capture_requested_packages,
+    clear_command,
+    report_error,
+)
 
 try:
     from conda_build import __version__ as conda_build_version
@@ -293,10 +303,41 @@ def conda_settings() -> Iterator[CondaSetting]:
 
 
 @hookimpl
+def conda_pre_commands() -> Iterator[CondaPreCommand]:
+    """Register capture_command() as a conda pre-command hook."""
+    yield CondaPreCommand(
+        name="conda-anaconda-telemetry-pre-command",
+        action=capture_command,
+        run_for={"install"},
+    )
+
+
+@hookimpl
+def conda_pre_solves() -> Iterator[CondaPreSolve]:
+    """Register capture_requested_packages() as a conda pre-solve hook."""
+    yield CondaPreSolve(
+        name="conda-anaconda-telemetry-pre-solve",
+        action=capture_requested_packages,
+    )
+
+
+@hookimpl
+def conda_post_commands() -> Iterator[CondaPostCommand]:
+    """Register clear_command() as a conda post-command hook."""
+    yield CondaPostCommand(
+        name="conda-anaconda-telemetry-post-command",
+        action=clear_command,
+        run_for={"install"},
+    )
+
+
+@hookimpl
 def conda_exception_observers() -> Generator[CondaExceptionObserver, None, None]:
     """Register report_error() function as a conda exception observers hook."""
     yield CondaExceptionObserver(
         name="conda-anaconda-telemetry",
         hook=report_error,
-        watch_for={"PackagesNotFoundError"},
+        # We intentionally observe BaseException such
+        # that report_error() can clear the captured state.
+        watch_for={"BaseException"},
     )
