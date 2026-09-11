@@ -102,6 +102,7 @@ class AnacondaTelemetry:
 
     def _make_config(self) -> Configuration:
         config = Configuration(default_endpoint=self.default_endpoint)
+        # TODO(#236): Disable session IDs once the required SDK release is available.
         if "localhost" in self.default_endpoint.lower():
             # Set the configuration for test and development
             config.set_skip_internet_check(True)
@@ -109,6 +110,7 @@ class AnacondaTelemetry:
         return config
 
     def _make_attributes(self) -> ResourceAttributes:
+        # TODO(#236): Exclude hostname once the required SDK release is available.
         attributes = ResourceAttributes(
             self.service_name, self.service_version, anon_usage=True
         )
@@ -126,11 +128,16 @@ class AnacondaTelemetry:
 
     def initialize(self) -> None:
         """Initialize telemetry."""
-        sig.initialize_telemetry(
-            config=self._make_config(),
-            attributes=self._make_attributes(),
-            signal_types=["logging"],
-        )
+        resource_attributes = os.environ.pop("OTEL_RESOURCE_ATTRIBUTES", None)
+        try:
+            sig.initialize_telemetry(
+                config=self._make_config(),
+                attributes=self._make_attributes(),
+                signal_types=["logging"],
+            )
+        finally:
+            if resource_attributes is not None:
+                os.environ["OTEL_RESOURCE_ATTRIBUTES"] = resource_attributes
 
     def send_event(
         self, event_name: str, body: str, attributes: dict[str, Any] | None = None

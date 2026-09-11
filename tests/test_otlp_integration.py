@@ -108,6 +108,7 @@ def test_real_otlp_payload_received_by_local_collector(
             "ATEL_DEFAULT_ENDPOINT": otlp_server,
             "ATEL_ENVIRONMENT": "test",
             "ATEL_SESSION_ENTROPY_VALUE": "test-session-entropy",
+            "OTEL_RESOURCE_ATTRIBUTES": "foo.bar=something",
         },
     )
     mocker.patch(
@@ -134,6 +135,7 @@ def test_real_otlp_payload_received_by_local_collector(
         channels=(),
     )
     plugin_module.report_error(event)
+    assert os.environ["OTEL_RESOURCE_ATTRIBUTES"] == "foo.bar=something"
 
     # Export is asynchronous. Flush this test's logger because the global
     # provider may belong to telemetry initialized by another test.
