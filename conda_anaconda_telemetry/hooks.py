@@ -16,7 +16,7 @@ from conda.common.configuration import PrimitiveParameter
 from conda.common.url import mask_anaconda_token
 from conda.models.channel import all_channel_urls
 from conda.plugins import hookimpl
-from conda.plugins.types import CondaRequestHeader, CondaSetting, CondaExceptionObserver
+from conda.plugins.types import CondaExceptionObserver, CondaRequestHeader, CondaSetting
 
 from conda_anaconda_telemetry.plugin import report_error
 
