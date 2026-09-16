@@ -18,6 +18,7 @@ from conda_anaconda_telemetry.otel import (
     OTHER_CHANNEL_LABEL,
     AnacondaTelemetry,
     get_install_attributes,
+    get_success_attributes,
     package_names,
 )
 
@@ -265,3 +266,51 @@ def test_get_install_attributes_truncation(
     assert attributes is not None
     assert attributes["requested.packages"] == expected_kept
     assert attributes["truncated"] == expected_truncated
+
+
+@pytest.mark.parametrize("command", ["install", "create"])
+def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
+    """Success attributes use the current schema plus resolved packages."""
+    mocker.patch(
+        "conda_anaconda_telemetry.otel.context",
+        mocker.MagicMock(channel_priority="strict"),
+    )
+
+    attributes = get_success_attributes(
+        command=command,
+        channels=["defaults", "main-x", "private-channel"],
+        requested_names=["pkg_bar", "pkg_foo"],
+        resolved_packages=["pkg_foo=9.9.9=1"],
+    )
+
+    assert attributes == {
+        "command": command,
+        "event.schema_version": "1",
+        "install.channels": ["defaults", "main-x", OTHER_CHANNEL_LABEL],
+        "install.channel_priority": "strict",
+        "requested.packages": ["pkg_bar", "pkg_foo"],
+        "resolved.packages": ["pkg_foo=9.9.9=1"],
+        "truncated": False,
+    }
+
+
+def test_get_success_attributes_truncated_resolved_packages(
+    mocker: MockerFixture,
+) -> None:
+    """truncated reflects resolved.packages truncation too, not just shared fields."""
+    mocker.patch(
+        "conda_anaconda_telemetry.otel.context",
+        mocker.MagicMock(channel_priority="strict"),
+    )
+
+    attributes = get_success_attributes(
+        command="install",
+        channels=[],
+        requested_names=[],
+        resolved_packages=[f"pkg_{i}=1=0" for i in range(LIST_ITEM_LIMIT + 1)],
+    )
+
+    # Byte limit (not item limit) is what trips first for these longer,
+    # version-qualified package strings - see LIST_BYTE_LIMIT.
+    assert len(attributes["resolved.packages"]) < LIST_ITEM_LIMIT
+    assert attributes["truncated"] is True
