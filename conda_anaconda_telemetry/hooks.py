@@ -310,7 +310,7 @@ def conda_pre_commands() -> Iterator[CondaPreCommand]:
     yield CondaPreCommand(
         name="conda-anaconda-telemetry-pre-command",
         action=capture_command,
-        run_for={"install"},
+        run_for={"create", "install"},
     )
 
 
@@ -329,7 +329,7 @@ def conda_post_commands() -> Iterator[CondaPostCommand]:
     yield CondaPostCommand(
         name="conda-anaconda-telemetry-post-command",
         action=clear_command,
-        run_for={"install"},
+        run_for={"create", "install"},
     )
 
 

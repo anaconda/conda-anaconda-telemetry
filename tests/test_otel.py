@@ -151,7 +151,8 @@ def test_package_names_none_when_not_representable(specs: list[str]) -> None:
     assert package_names(specs) is None
 
 
-def test_get_install_attributes(mocker: MockerFixture) -> None:
+@pytest.mark.parametrize("command", ["create", "install"])
+def test_get_install_attributes(mocker: MockerFixture, command: str) -> None:
     """All install.* keys are assembled from the event and the captured request."""
     mocker.patch(
         "conda_anaconda_telemetry.otel.context",
@@ -170,11 +171,11 @@ def test_get_install_attributes(mocker: MockerFixture) -> None:
         ),
     )
     attributes = get_install_attributes(
-        event, command="install", requested_names=["pkg_foo", "pkg_bar"]
+        event, command=command, requested_names=["pkg_foo", "pkg_bar"]
     )
 
     assert attributes == {
-        "command": "install",
+        "command": command,
         "event.schema_version": "1",
         "install.channels": [
             "defaults",

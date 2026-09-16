@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 class TelemetryCommand(str, Enum):
     """Supported commands for telemetry tracking."""
 
+    CREATE = "create"
     INSTALL = "install"
 
 
@@ -52,9 +53,12 @@ command_request = CommandRequest()
 def capture_command(command: str) -> None:
     """Pre-command hook to record the active command and reset old state."""
     command_request.requested_names = None
-    if context.plugins.anaconda_telemetry and command == TelemetryCommand.INSTALL:
+    if not context.plugins.anaconda_telemetry:
+        command_request.command = None
+        return
+    try:
         command_request.command = TelemetryCommand(command)
-    else:
+    except ValueError:
         command_request.command = None
 
 
@@ -62,10 +66,7 @@ def capture_requested_packages(
     specs_to_add: frozenset[MatchSpec], _specs_to_remove: frozenset[MatchSpec]
 ) -> None:
     """Pre-solve hook to extract and save requested package names from specs."""
-    if (
-        context.plugins.anaconda_telemetry
-        and command_request.command == TelemetryCommand.INSTALL
-    ):
+    if context.plugins.anaconda_telemetry and command_request.command is not None:
         command_request.requested_names = package_names(list(specs_to_add))
 
 
@@ -86,7 +87,7 @@ def report_error(event: CondaExceptionEvent) -> None:
             return
         command = command_request.command
         requested_names = command_request.requested_names
-        if command != TelemetryCommand.INSTALL or requested_names is None:
+        if command is None or requested_names is None:
             return
         # Guard again even though the observer is only registered for this
         # class, in case of a name collision in `watch_for`.
