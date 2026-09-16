@@ -24,7 +24,7 @@ description = "A conda plugin for Anaconda Telemetry"
 dynamic = [
   "version",
 ]
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 name = "conda-anaconda-telemetry"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -72,7 +72,7 @@ testpaths = ["tests"]
 target-version = "py39"
 
 [tool.ruff.lint]
-extend-per-file-ignores = {"tests/*" = ["D", "S101"]}
+extend-per-file-ignores = { "tests/*" = ["D", "S101"] }
 ignore = ["D203", "D213", "ISC001"]
 # see https://docs.astral.sh/ruff/rules/
 select = [
