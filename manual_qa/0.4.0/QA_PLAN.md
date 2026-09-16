@@ -507,6 +507,7 @@ Repeat S1-S5 and S12 on Windows 11, macOS arm64, and Linux x86_64. Verify `os.ty
 * The signal still contains `hostname` and `session.id` in resource attributes pending [#236](https://github.com/anaconda/conda-anaconda-telemetry/issues/236); SDK 1.2.2 hashes `hostname`. This is expected, not a privacy bug.
 * Only `PackagesNotFoundInChannelsError` is reported; `UnsatisfiableError`, network errors, `CondaValueError`, and other failures intentionally emit nothing. No event in these cases is expected, not a bug.
 * Existing HTTP-header telemetry remains active alongside OTel telemetry in 0.4.0; don't mistake this legacy traffic for the new OTel events when inspecting network activity.
+* `install.channels`/`create.channels` omit channels supplied only via an environment file (`--file`) passed to `conda install`/`create`; only channels configured via `.condarc`/CLI at command-start time are captured. Tracked in [#237](https://github.com/anaconda/conda-anaconda-telemetry/issues/237).
 
 ## 8. Additional Information
 
