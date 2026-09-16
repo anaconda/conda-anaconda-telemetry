@@ -86,7 +86,12 @@ conda list -n base anaconda-opentelemetry            # expected: 1.2.2 or newer
 
 # Confirm that the plugin is registered and enabled.
 conda config --describe plugins.anaconda_telemetry   # expected: default value True
+
+# Record the exact released artifacts used for this platform.
+conda list -n base --explicit > conda-qa-base-explicit.txt
 ```
+
+Attach `conda-qa-base-explicit.txt` to the QA results for each platform. This records the exact package builds and channels used in the test environment.
 
 ## 4. Configuration
 
@@ -507,7 +512,7 @@ Repeat S1-S5 and S12 on Windows 11, macOS arm64, and Linux x86_64. Verify `os.ty
 * The signal still contains `hostname` and `session.id` in resource attributes pending [#236](https://github.com/anaconda/conda-anaconda-telemetry/issues/236); SDK 1.2.2 hashes `hostname`. This is expected, not a privacy bug.
 * Only `PackagesNotFoundInChannelsError` is reported; `UnsatisfiableError`, network errors, `CondaValueError`, and other failures intentionally emit nothing. No event in these cases is expected, not a bug.
 * Existing HTTP-header telemetry remains active alongside OTel telemetry in 0.4.0; don't mistake this legacy traffic for the new OTel events when inspecting network activity.
-* `install.channels`/`create.channels` omit channels supplied only via an environment file (`--file`) passed to `conda install`/`create`; only channels configured via `.condarc`/CLI at command-start time are captured. Tracked in [#237](https://github.com/anaconda/conda-anaconda-telemetry/issues/237).
+* `install.channels` omits channels supplied only by an environment YAML file passed with `--file`; only channels configured through `.condarc` or the command line are captured. Tracked in [#237](https://github.com/anaconda/conda-anaconda-telemetry/issues/237).
 
 ## 8. Additional Information
 
