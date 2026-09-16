@@ -14,7 +14,17 @@ from __future__ import annotations
 
 import json
 import sys
+from types import SimpleNamespace
 from typing import cast
+
+from conda.exceptions import PackagesNotFoundInChannelsError
+
+from conda_anaconda_telemetry.otel import (
+    AnacondaTelemetry,
+    get_install_attributes,
+    get_success_attributes,
+)
+from conda_anaconda_telemetry.resource_attributes import get_installer_attributes
 
 
 def _get_resource_attributes() -> tuple[dict[str, object], bool]:
@@ -27,9 +37,6 @@ def _get_resource_attributes() -> tuple[dict[str, object], bool]:
 
     Returns (attributes, installer_is_synthetic).
     """
-    from conda_anaconda_telemetry.otel import AnacondaTelemetry
-    from conda_anaconda_telemetry.resource_attributes import get_installer_attributes
-
     attributes = AnacondaTelemetry()._make_attributes()
 
     # .installer.info may be absent on this machine, which would undercount
@@ -48,37 +55,48 @@ def _get_resource_attributes() -> tuple[dict[str, object], bool]:
 
 
 def _get_error_signal_attributes() -> dict[str, object]:
-    """install.error's event attributes.
+    """install.pnfe's event attributes, built from a fabricated failure.
 
-    Currently always {} - conda_anaconda_telemetry doesn't gather
-    install.error attributes yet.
-
-    TODO: once an attribute-gathering function for install.* exists,
-    call it here (with a fabricated event/argv so this doesn't require a
-    real PackagesNotFoundError) instead of returning {}.
+    Mirrors what report_error() sends when a PackagesNotFoundInChannelsError
+    is raised while requesting "numpy" from "defaults".
     """
-    return {}
+    event = SimpleNamespace(
+        exc_type=PackagesNotFoundInChannelsError,
+        exc_value=SimpleNamespace(packages=("numpy",)),
+        channels=("defaults",),
+    )
+    attributes = get_install_attributes(
+        event, command="install", requested_names=["numpy"]
+    )
+    if attributes is None:
+        # This shouldn't happen but added for safety
+        raise RuntimeError("get_install_attributes returned None")
+    return attributes
 
 
-ERROR_SIGNAL: dict[str, object] = {
-    "event_name": "install.error",
-    "body": "",
-    "attributes": _get_error_signal_attributes(),
-}
+def _get_success_signal_attributes() -> dict[str, object]:
+    """install.success's event attributes, built from a fabricated result."""
+    return get_success_attributes(
+        command="install",
+        channels=["defaults"],
+        requested_names=["numpy"],
+        resolved_packages=["numpy=1.26.4=py311h1234567_0"],
+    )
 
-# Representative success payload
-SUCCESS_SIGNAL: dict[str, object] = {
-    "event_name": "install.success",
-    "body": "",
-    "attributes": {
-        "success.execution_time": "1.2345",
-        "success.packages": json.dumps(
-            [
-                {"channel": "defaults", "package": "numpy", "version": "1.26.4"},
-            ]
-        ),
-    },
-}
+
+def _build_signals() -> tuple[dict[str, object], dict[str, object]]:
+    """Build the error and success signal payloads."""
+    error_signal: dict[str, object] = {
+        "event_name": "install.pnfe",
+        "body": "",
+        "attributes": _get_error_signal_attributes(),
+    }
+    success_signal: dict[str, object] = {
+        "event_name": "install.success",
+        "body": "",
+        "attributes": _get_success_signal_attributes(),
+    }
+    return error_signal, success_signal
 
 
 def _byte_size(obj: object) -> int:
@@ -95,13 +113,13 @@ def main() -> None:
     print("Telemetry payload size measurement")
     print("=" * 60)
 
-    # Resource attributes — shared across all signals
+    # Resource attributes and signal payloads, built together so a failure
+    # in either (e.g. reading system/installer info) prints one clean error.
     try:
         resource_attrs, installer_is_synthetic = _get_resource_attributes()
+        error_signal, success_signal = _build_signals()
     except Exception as exc:
-        print(
-            f"\nERROR: could not assemble resource attributes: {exc}", file=sys.stderr
-        )
+        print(f"\nERROR: could not assemble telemetry payloads: {exc}", file=sys.stderr)
         sys.exit(1)
 
     print("\n[Resource attributes]")
@@ -118,7 +136,7 @@ def main() -> None:
         )
 
     # Per-signal payloads
-    for signal in (ERROR_SIGNAL, SUCCESS_SIGNAL):
+    for signal in (error_signal, success_signal):
         event_name = signal["event_name"]
         print(f"\n[{event_name} signal payload]")
         _print_row("event_name", _byte_size(signal["event_name"]))

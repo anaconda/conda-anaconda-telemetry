@@ -3,7 +3,8 @@
 #
 # Measure the overhead of conda-anaconda-telemetry by comparing command
 # wall-clock time with telemetry enabled vs disabled, for each of:
-# env create, package install, search, and the error path.
+# env create, package install (two variants, see run_install below),
+# search, and the error path.
 #
 # Prerequisites:
 #   - hyperfine is on PATH
@@ -12,15 +13,16 @@
 # The install benchmarks use a scratch env under a unique temp directory.
 #
 # Usage:
-#   bash scripts/benchmark_timing.sh [--output-table] [--only=create,install,search,error] [-n=25]
+#   bash scripts/benchmark_timing.sh [--output-table] [--only=create,install,install-link,search,error] [-n=25]
 #
 # --output-table also prints one combined markdown table summary, example:
-#    | Benchmark  | Disabled (s)  | Enabled (s)   | Overhead |
-#    |:---------|:------------|:------------|:-------|
-#    | create     | 5.148 ± 0.414 | 5.033 ± 0.235 | -2.2%    |
-#    | install    | 4.169 ± 1.085 | 4.109 ± 1.098 | -1.4%    |
-#    | search     | 2.183 ± 0.105 | 2.210 ± 0.234 | +1.2%    |
-#    | error path | 4.326 ± 0.637 | 4.877 ± 0.587 | +12.7%   |
+#    | Benchmark    | Disabled (s)  | Enabled (s)   | Overhead |
+#    |:-------------|:--------------|:--------------|:---------|
+#    | create       | 5.148 ± 0.414 | 5.033 ± 0.235 | -2.2%    |
+#    | install      | 4.169 ± 1.085 | 4.109 ± 1.098 | -1.4%    |
+#    | install-link | 6.203 ± 0.512 | 6.281 ± 0.498 | +1.3%    |
+#    | search       | 2.183 ± 0.105 | 2.210 ± 0.234 | +1.2%    |
+#    | error path   | 4.326 ± 0.637 | 4.877 ± 0.587 | +12.7%   |
 #
 # --only restricts which benchmarks run (default: all, comma-separated).
 # -n sets the number of hyperfine runs per benchmark (default: 25).
@@ -28,11 +30,11 @@
 
 set -euo pipefail
 
-ALL_BENCHMARKS=(create install search error)
+ALL_BENCHMARKS=(create install install-link search error)
 # Benchmarks that leave state in $BENCH_PREFIX and must be cleaned up after.
-CLEANUP_BENCHMARKS=(create install error)
+CLEANUP_BENCHMARKS=(create install install-link error)
 # Benchmarks that require $BENCH_PREFIX to already exist before they run.
-NEEDS_PREFIX_BENCHMARKS=(install error)
+NEEDS_PREFIX_BENCHMARKS=(install install-link error)
 
 is_known_benchmark() {
   local name="$1" candidate
@@ -86,6 +88,7 @@ done
 
 WARMUP=2
 DISABLED="CONDA_PLUGINS_ANACONDA_TELEMETRY=false"
+ENABLED="CONDA_PLUGINS_ANACONDA_TELEMETRY=true"
 BENCH_ROOT=$(mktemp -d)
 BENCH_PREFIX="${BENCH_ROOT}/cat-bench"
 
@@ -112,24 +115,12 @@ run_benchmark() {
   local name="$1" label="$2" prepare="$3" disabled_cmd="$4" enabled_cmd="$5"
   echo ""
   echo ">>> ${label}"
+  local args=(--shell bash --runs "$RUNS" --warmup "$WARMUP")
   if [ -n "$prepare" ]; then
-    hyperfine \
-      --shell bash \
-      --runs "$RUNS" \
-      --warmup "$WARMUP" \
-      --prepare "$prepare" \
-      --export-json "${JSON_DIR}/${name}.json" \
-      "$disabled_cmd" \
-      "$enabled_cmd"
-  else
-    hyperfine \
-      --shell bash \
-      --runs "$RUNS" \
-      --warmup "$WARMUP" \
-      --export-json "${JSON_DIR}/${name}.json" \
-      "$disabled_cmd" \
-      "$enabled_cmd"
+    args+=(--prepare "$prepare")
   fi
+  args+=(--export-json "${JSON_DIR}/${name}.json" "$disabled_cmd" "$enabled_cmd")
+  hyperfine "${args[@]}"
 }
 
 run_create() {
@@ -137,16 +128,27 @@ run_create() {
     "conda create -p ${BENCH_PREFIX} python -y" \
     "${CONDA_INIT} conda env remove -p ${BENCH_PREFIX} -q -y 2>/dev/null || true" \
     "${CONDA_INIT} ${DISABLED} conda create -p ${BENCH_PREFIX} python -y" \
-    "${CONDA_INIT} conda create -p ${BENCH_PREFIX} python -y"
+    "${CONDA_INIT} ${ENABLED} conda create -p ${BENCH_PREFIX} python -y"
 }
 
 run_install() {
-  # prepare pre-installs numpy so each timed run measures a reinstall.
+  # prepare pre-installs numpy, so the timed install has nothing left to
+  # solve or link. See run_install_link for the real install/link cost.
   run_benchmark install \
-    "conda install -p ${BENCH_PREFIX} numpy -y" \
+    "conda install -p ${BENCH_PREFIX} numpy -y (already satisfied)" \
     "${CONDA_INIT} conda install -p ${BENCH_PREFIX} numpy -y -q 2>/dev/null || true" \
     "${CONDA_INIT} ${DISABLED} conda install -p ${BENCH_PREFIX} numpy -y" \
-    "${CONDA_INIT} conda install -p ${BENCH_PREFIX} numpy -y"
+    "${CONDA_INIT} ${ENABLED} conda install -p ${BENCH_PREFIX} numpy -y"
+}
+
+run_install_link() {
+  # prepare removes numpy before each run, so the timed install has real
+  # work to do, unlike the already-installed case in run_install above.
+  run_benchmark install-link \
+    "conda install -p ${BENCH_PREFIX} numpy -y (linking)" \
+    "${CONDA_INIT} conda remove -p ${BENCH_PREFIX} numpy -y -q 2>/dev/null || true" \
+    "${CONDA_INIT} ${DISABLED} conda install -p ${BENCH_PREFIX} numpy -y" \
+    "${CONDA_INIT} ${ENABLED} conda install -p ${BENCH_PREFIX} numpy -y"
 }
 
 run_search() {
@@ -154,11 +156,11 @@ run_search() {
     "conda search scikit-learn" \
     "" \
     "${CONDA_INIT} ${DISABLED} conda search scikit-learn" \
-    "${CONDA_INIT} conda search scikit-learn"
+    "${CONDA_INIT} ${ENABLED} conda search scikit-learn"
 }
 
 run_error() {
-  local enabled_cmd="${CONDA_INIT} conda install -p ${BENCH_PREFIX} nonexistent-packageabc"
+  local enabled_cmd="${CONDA_INIT} ${ENABLED} conda install -p ${BENCH_PREFIX} nonexistent-packageabc"
 
   # One-time sanity check (not timed) that this reproduces the error path
   # we intend to measure, rather than e.g. EnvironmentLocationNotFound if
@@ -196,6 +198,7 @@ for name in "${SELECTED[@]}"; do
   case "$name" in
     create) run_create; SUMMARIZE_ARGS+=("create=${JSON_DIR}/create.json") ;;
     install) run_install; SUMMARIZE_ARGS+=("install=${JSON_DIR}/install.json") ;;
+    install-link) run_install_link; SUMMARIZE_ARGS+=("install-link=${JSON_DIR}/install-link.json") ;;
     search) run_search; SUMMARIZE_ARGS+=("search=${JSON_DIR}/search.json") ;;
     error) run_error; SUMMARIZE_ARGS+=("error path=${JSON_DIR}/error.json") ;;
   esac
