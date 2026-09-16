@@ -201,6 +201,29 @@ def _truncate(
     return kept, truncated
 
 
+def _get_command_attributes(
+    *, command: str, channels: list[str], requested_names: list[str]
+) -> tuple[dict[str, Any], bool]:
+    """Build fields shared by install/create error and success events."""
+    safe_channels, channels_truncated = _truncate(
+        [
+            channel if channel in KNOWN_INSTALL_CHANNELS else OTHER_CHANNEL_LABEL
+            for channel in channels
+        ]
+    )
+    packages, packages_truncated = _truncate(requested_names)
+    return (
+        {
+            "command": command,
+            "event.schema_version": SIGNAL_VERSION,
+            "install.channels": safe_channels,
+            "install.channel_priority": str(context.channel_priority),
+            "requested.packages": packages,
+        },
+        channels_truncated or packages_truncated,
+    )
+
+
 def get_install_attributes(
     event: CondaExceptionEvent,
     *,
@@ -213,24 +236,36 @@ def get_install_attributes(
         logger.debug("Skipping telemetry because package names could not be read.")
         return None
 
-    channels, channels_truncated = _truncate(
-        [
-            channel if channel in KNOWN_INSTALL_CHANNELS else OTHER_CHANNEL_LABEL
-            for channel in event.channels or ()
-        ]
+    attributes, truncated = _get_command_attributes(
+        command=command,
+        channels=list(event.channels or ()),
+        requested_names=requested_names,
     )
-    packages, packages_truncated = _truncate(requested_names)
     missing_specs, missing_specs_truncated = _truncate(missing_names)
 
     return {
-        "command": command,
-        "event.schema_version": SIGNAL_VERSION,
-        "install.channels": channels,
-        "install.channel_priority": str(context.channel_priority),
-        "requested.packages": packages,
+        **attributes,
         "exception.name": event.exc_type.__name__,
         "exception.missing_specs": missing_specs,
-        "truncated": channels_truncated
-        or packages_truncated
-        or missing_specs_truncated,
+        "truncated": truncated or missing_specs_truncated,
+    }
+
+
+def get_success_attributes(
+    *,
+    command: str,
+    channels: list[str],
+    requested_names: list[str],
+    resolved_packages: list[str],
+) -> dict[str, Any]:
+    """Build attributes for an install/create success signal."""
+    attributes, truncated = _get_command_attributes(
+        command=command, channels=channels, requested_names=requested_names
+    )
+    resolved, resolved_truncated = _truncate(resolved_packages)
+
+    return {
+        **attributes,
+        "resolved.packages": resolved,
+        "truncated": truncated or resolved_truncated,
     }
