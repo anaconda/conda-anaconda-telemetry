@@ -121,8 +121,9 @@ def test_real_otlp_payload_received_by_local_collector(
     )
     mocker.patch(
         "conda_anaconda_telemetry.otel.context",
-        SimpleNamespace(channel_priority="strict"),
+        SimpleNamespace(channel_priority="strict", proxy_servers={}),
     )
+    mocker.patch("anaconda_opentelemetry.config.Configuration.set_console_exporter")
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
