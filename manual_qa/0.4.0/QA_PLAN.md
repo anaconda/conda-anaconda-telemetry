@@ -31,7 +31,7 @@
 python >=3.10
 conda >=26.7.2
 anaconda-opentelemetry >=1.2.2
-conda-anaconda-telemetry 0.4.0 (installed in the base environment)
+conda-anaconda-telemetry 0.4.0 canary (installed in the base environment)
 ```
 
 * Other Requirements: Internet access; approximately 2 GB of free disk space for temporary environments; `Docker` for the local collector test in S15.
@@ -40,7 +40,7 @@ conda-anaconda-telemetry 0.4.0 (installed in the base environment)
 
 ### Prerequisites
 
-Install a fresh Miniconda in `~/conda-qa` (`%USERPROFILE%\conda-qa` on Windows) to prevent host conda configuration from affecting results. Install the plugin in the base environment because that is where conda runs.
+Install a fresh Miniconda in `~/conda-qa` (`%USERPROFILE%\conda-qa` on Windows) to prevent host conda configuration from affecting results. Install the plugin in the base environment because that is where conda runs. The canary package is published to the `distribution-plugins/label/dev` channel.
 
 ### Installation Commands
 
@@ -56,8 +56,9 @@ bash /tmp/miniconda.sh -b -p ~/conda-qa
 # Step 3: Initialize conda, then restart the shell.
 ~/conda-qa/bin/conda init
 
-# Step 4: Install conda and the plugin in base.
-conda install -n base -c defaults "conda=26.7.2" "conda-anaconda-telemetry=0.4.0"
+# Step 4: Install conda and the latest plugin canary in base.
+conda install -n base -c distribution-plugins/label/dev -c defaults \
+  "conda=26.7.2" conda-anaconda-telemetry
 ```
 
 #### Windows (64-bit, PowerShell)
@@ -69,8 +70,9 @@ curl.exe -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86
 # Step 2: Install silently.
 Start-Process -Wait "$env:TEMP\miniconda.exe" -ArgumentList "/S /D=$env:USERPROFILE\conda-qa"
 
-# Step 3: Open Anaconda PowerShell Prompt and install conda and the plugin in base.
-conda install -n base -c defaults "conda=26.7.2" "conda-anaconda-telemetry=0.4.0"
+# Step 3: Open Anaconda PowerShell Prompt and install conda and the latest plugin canary in base.
+conda install -n base -c distribution-plugins/label/dev -c defaults `
+  "conda=26.7.2" conda-anaconda-telemetry
 ```
 
 ### Verification
@@ -81,7 +83,7 @@ conda info
 
 # Confirm package versions.
 conda --version                                      # expected: 26.7.2
-conda list -n base conda-anaconda-telemetry          # expected: 0.4.0
+conda list -n base conda-anaconda-telemetry          # expected: a canary version with a Git hash
 conda list -n base anaconda-opentelemetry            # expected: 1.2.2 or newer
 
 # Confirm that the plugin is registered and enabled.
