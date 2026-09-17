@@ -311,7 +311,7 @@ jobs:
           Path(environ["GITHUB_ENV"]).write_text("\n".join(f"{name}={value}" for name, value in envs.items()))
 
       - name: Create & Upload
-        uses: conda/actions/canary-release@0f4ec1506e74c12799813dc66e613a39077ea864 # v26.7.0
+        uses: conda/actions/canary-release@faab6a942e6e8490cd82eee2f6a2b174dace8e9e # v26.9.1
         with:
           package-name: ${{ github.event.repository.name }}
           subdir: ${{ matrix.subdir }}
