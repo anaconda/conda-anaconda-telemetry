@@ -25,14 +25,16 @@ from conda_anaconda_telemetry.otel import (
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+DUMMY_ENDPOINT = "http://localhost:4318"
+
 
 @pytest.mark.parametrize(
     "environment, default_endpoint",
     [
         ("production", "https://public.telemetry.anaconda.com/v1/logs"),
         ("staging", "https://metrics.stage.anacondaconnect.com/v1/logs"),
-        ("test", "http://localhost:4318"),
-        ("development", "http://localhost:4318"),
+        ("test", DUMMY_ENDPOINT),
+        ("development", DUMMY_ENDPOINT),
         ("", "https://public.telemetry.anaconda.com/v1/logs"),
     ],
 )
@@ -94,24 +96,141 @@ def test_anaconda_telemetry_rejects_non_loopback_cleartext(
 
 
 @pytest.mark.parametrize(
-    "default_endpoint,expected",
+    "default_endpoint,expected_console_exporter",
     [
-        ("http://localhost:4318", True),
+        (DUMMY_ENDPOINT, True),
         ("https://public.telemetry.anaconda.com/v1/logs", False),
     ],
 )
 def test_make_config(
-    monkeypatch: pytest.MonkeyPatch, default_endpoint: str, expected: bool
+    monkeypatch: pytest.MonkeyPatch,
+    default_endpoint: str,
+    expected_console_exporter: bool,
 ) -> None:
-    """Only a localhost endpoint skips the internet check and uses the
-    console exporter.
+    """Only a localhost endpoint uses the console exporter, but every
+    endpoint skips the internet check and defers shutdown timing to us
+    (instead of an unbounded atexit handler), regardless of environment.
     """
     monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", default_endpoint)
 
     config = AnacondaTelemetry()._make_config()
 
-    assert config._get_skip_internet_check() is expected
-    assert config._get_console_exporter() is expected
+    assert config._get_skip_internet_check() is True
+    assert config._get_shutdown_on_exit() is False
+    assert config._get_console_exporter() is expected_console_exporter
+
+
+def test_anaconda_telemetry_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:
+    """shutdown() flushes telemetry within a fixed time budget instead of
+    relying on the SDK's own unbounded atexit handler.
+    """
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+    flush_calls = []
+    monkeypatch.setattr(sig, "flush_telemetry", lambda: flush_calls.append(True))
+
+    AnacondaTelemetry().shutdown()
+
+    assert flush_calls == [True]
+
+
+def test_anaconda_telemetry_shutdown_is_repeatable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """shutdown() must flush every time it's called, not just the first."""
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+    flush_calls = []
+    monkeypatch.setattr(sig, "flush_telemetry", lambda: flush_calls.append(True))
+
+    telemetry = AnacondaTelemetry()
+    telemetry.shutdown()
+    telemetry.shutdown()
+
+    assert flush_calls == [True, True]
+
+
+def test_send_event_always_shuts_down(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Flush telemetry even when sending the event fails."""
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+
+    def mock_send_event(**_kwargs: str) -> None:
+        raise RuntimeError("fail")
+
+    monkeypatch.setattr(sig, "send_event", mock_send_event)
+    flush_calls = []
+    monkeypatch.setattr(sig, "flush_telemetry", lambda: flush_calls.append(True))
+
+    with pytest.raises(RuntimeError, match="fail"):
+        AnacondaTelemetry().send_event("install.error", "")
+
+    assert flush_calls == [True]
+
+
+def test_send_event_twice_in_one_process_flushes_both(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sending two events in one process should flush both, not just the first."""
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+
+    sent_events = []
+
+    # Named function instead of a lambda: linter dislikes `.append() or True`.
+    def fake_send_event(**kwargs: str) -> bool:
+        sent_events.append(kwargs)
+        return True
+
+    monkeypatch.setattr(sig, "send_event", fake_send_event)
+    flush_calls = []
+    monkeypatch.setattr(sig, "flush_telemetry", lambda: flush_calls.append(True))
+
+    telemetry = AnacondaTelemetry()
+    telemetry.send_event("install.error", "first")
+    telemetry.send_event("install.error", "second")
+
+    assert len(sent_events) == 2
+    assert flush_calls == [True, True]
+
+
+def test_flush_telemetry_misses_events_when_another_provider_registered_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """This test currently reproduces a bug:
+    if something else already filled OTel's shared
+    "current logger provider" slot first, flush_telemetry() flushes that
+    provider instead of ours, so our own queued events never get sent.
+
+    When fixed upstream, the first assert below will
+    fail, since our events would already be flushed by that point.
+    """
+    import io
+
+    import opentelemetry._logs._internal as logs_internal
+    from anaconda_opentelemetry.logging import _AnacondaLogger
+    from opentelemetry.sdk._logs import LoggerProvider
+
+    monkeypatch.setattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED", False)
+    # Simulate the shared slot already being filled by something else, so our
+    # own attempt to fill it later is a silent no-op, like it would be in
+    # production.
+    monkeypatch.setattr(logs_internal, "_LOGGER_PROVIDER", LoggerProvider())
+    monkeypatch.setattr(logs_internal._LOGGER_PROVIDER_SET_ONCE, "_done", True)
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+
+    telemetry = AnacondaTelemetry()
+    telemetry.initialize()
+    console_out = io.StringIO()
+    _AnacondaLogger._instance._test_set_console_mock(console_out)
+
+    telemetry.send_event("install.error", "first")
+    telemetry.send_event("install.error", "second")
+
+    # Bug: flush_telemetry() flushed the wrong provider, so nothing sent yet.
+    assert console_out.getvalue() == ""
+
+    # Our provider still has the events queued; flushing it directly (not via
+    # the shared slot) proves they were queued fine and only the flush step
+    # was wrong.
+    _AnacondaLogger._instance._provider.force_flush()
+    assert "first" in console_out.getvalue()
 
 
 def test_make_attributes_system_info() -> None:
