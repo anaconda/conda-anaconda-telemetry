@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import platform
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -408,6 +409,48 @@ def test_auth_token_env_vars_are_neutralized(
     config = AnacondaTelemetry()._make_config()
 
     assert config._get_auth_token_logging() is None
+
+
+@pytest.mark.parametrize(
+    "env_var", ["OTEL_EXPORTER_OTLP_HEADERS", "OTEL_EXPORTER_OTLP_LOGS_HEADERS"]
+)
+def test_otlp_header_env_vars_are_neutralized(
+    monkeypatch: pytest.MonkeyPatch, env_var: str
+) -> None:
+    """These headers must not reach the collector. The exporter reads them
+    directly, so ignore_environment_variables=True alone does not stop them.
+    """
+    monkeypatch.setenv("ATEL_ENVIRONMENT", "production")
+    monkeypatch.setenv(env_var, "x-injected=malicious")
+    monkeypatch.setattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED", False)
+
+    telemetry = AnacondaTelemetry()
+    telemetry.initialize()
+
+    exporter = sig._AnacondaLogger._instance.exporter._exporter
+    assert "x-injected" not in exporter._session.headers
+
+
+def test_otel_resource_attributes_env_var_is_neutralized_during_init(
+    monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+) -> None:
+    """OTEL_RESOURCE_ATTRIBUTES must be absent during SDK init, then
+    restored afterward for other tools that rely on it.
+    """
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "foo.bar=something")
+    monkeypatch.setattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED", False)
+
+    seen_during_init = []
+
+    def _capture_env(*_args: object, **_kwargs: object) -> None:
+        seen_during_init.append(os.environ.get("OTEL_RESOURCE_ATTRIBUTES"))
+
+    mocker.patch.object(sig, "initialize_telemetry", side_effect=_capture_env)
+
+    AnacondaTelemetry().initialize()
+
+    assert seen_during_init == [None]
+    assert os.environ["OTEL_RESOURCE_ATTRIBUTES"] == "foo.bar=something"
 
 
 @pytest.mark.parametrize(

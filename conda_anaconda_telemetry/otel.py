@@ -134,7 +134,17 @@ class AnacondaTelemetry:
 
     def initialize(self) -> None:
         """Initialize telemetry."""
-        resource_attributes = os.environ.pop("OTEL_RESOURCE_ATTRIBUTES", None)
+        # The OTLP exporter reads these headers directly from the
+        # environment, bypassing Configuration entirely, so
+        # ignore_environment_variables=True does not stop them.
+        saved_env = {
+            var: os.environ.pop(var, None)
+            for var in (
+                "OTEL_RESOURCE_ATTRIBUTES",
+                "OTEL_EXPORTER_OTLP_HEADERS",
+                "OTEL_EXPORTER_OTLP_LOGS_HEADERS",
+            )
+        }
         try:
             sig.initialize_telemetry(
                 config=self._make_config(),
@@ -142,8 +152,9 @@ class AnacondaTelemetry:
                 signal_types=["logging"],
             )
         finally:
-            if resource_attributes is not None:
-                os.environ["OTEL_RESOURCE_ATTRIBUTES"] = resource_attributes
+            for var, value in saved_env.items():
+                if value is not None:
+                    os.environ[var] = value
 
     def send_event(
         self, event_name: str, body: str, attributes: dict[str, Any] | None = None
