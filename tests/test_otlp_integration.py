@@ -165,7 +165,6 @@ def test_real_otlp_payload_received_by_local_collector(
         "conda.ci_detected",
         "conda.version",
         "environment",
-        "hostname",
         "installer.name",
         "installer.platform",
         "installer.version",
@@ -177,7 +176,6 @@ def test_real_otlp_payload_received_by_local_collector(
         "schema.version",
         "service.name",
         "service.version",
-        "session.id",
         "telemetry.sdk.language",
         "telemetry.sdk.name",
         "telemetry.sdk.version",
@@ -193,9 +191,8 @@ def test_real_otlp_payload_received_by_local_collector(
     assert resource_attrs["os.type"]
     assert resource_attrs["os.version"]
     assert resource_attrs["python.version"]
-    # Suppression is not yet supported, so verify these values are populated.
-    assert resource_attrs["hostname"]
-    assert resource_attrs["session.id"]
+    assert "hostname" not in resource_attrs
+    assert "session.id" not in resource_attrs
 
     assert scope_logs.scope.name == "conda-anaconda-telemetry_event_logger"
     assert scope_logs.scope.version == ""
