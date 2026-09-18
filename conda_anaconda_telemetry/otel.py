@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import anaconda_opentelemetry.signals as sig
+import requests.utils
 from anaconda_opentelemetry.attributes import ResourceAttributes
 from anaconda_opentelemetry.config import Configuration
 from conda.base.context import context
@@ -78,32 +79,35 @@ class AnacondaTelemetry:
     def __post_init__(self) -> None:
         """Set the default endpoint based on the environment.
 
-        If ATEL_DEFAULT_ENDPOINT is set, it will be used instead.
+        ATEL_DEFAULT_ENDPOINT can only pick a local http collector for testing;
+        any other value is ignored. ATEL_ENVIRONMENT never selects a remote
+        endpoint other than production — it is a label only.
         """
-        default_endpoint = os.getenv("ATEL_DEFAULT_ENDPOINT")
-        if default_endpoint is not None:
-            self.default_endpoint = default_endpoint
-        elif self.environment.value == "staging":
-            self.default_endpoint = "https://metrics.stage.anacondaconnect.com/v1/logs"
-        elif self.environment.value in ("test", "development"):
+        if self.environment.value in ("test", "development"):
             self.default_endpoint = "http://localhost:4318"
         else:
             self.default_endpoint = "https://public.telemetry.anaconda.com/v1/logs"
 
-        parsed_endpoint = urlparse(self.default_endpoint)
-        if parsed_endpoint.scheme not in ("http", "https", "grpc"):
-            raise ValueError("A valid default endpoint must be set.")
-
-        if parsed_endpoint.scheme == "http" and parsed_endpoint.hostname not in (
-            "localhost",
-            "127.0.0.1",
-        ):
-            raise ValueError("A valid default endpoint must be set.")
+        default_endpoint = os.getenv("ATEL_DEFAULT_ENDPOINT")
+        if default_endpoint is not None:
+            parsed_endpoint = urlparse(default_endpoint)
+            if parsed_endpoint.scheme == "http" and parsed_endpoint.hostname in (
+                "localhost",
+                "127.0.0.1",
+            ):
+                self.default_endpoint = default_endpoint
 
     def _make_config(self) -> Configuration:
-        config = Configuration(default_endpoint=self.default_endpoint)
+        config = Configuration(
+            default_endpoint=self.default_endpoint,
+            ignore_environment_variables=True,
+        )
         config.set_disable_session_id(True)
-        if "localhost" in self.default_endpoint.lower():
+        # Use conda's own proxy config instead of ATEL_PROXY_URL.
+        config.set_proxy_url(
+            requests.utils.select_proxy(self.default_endpoint, context.proxy_servers)
+        )
+        if urlparse(self.default_endpoint).hostname in ("localhost", "127.0.0.1"):
             # Set the configuration for test and development
             config.set_skip_internet_check(True)
             config.set_console_exporter(True)
@@ -130,7 +134,17 @@ class AnacondaTelemetry:
 
     def initialize(self) -> None:
         """Initialize telemetry."""
-        resource_attributes = os.environ.pop("OTEL_RESOURCE_ATTRIBUTES", None)
+        # The OTLP exporter reads these headers directly from the
+        # environment, bypassing Configuration entirely, so
+        # ignore_environment_variables=True does not stop them.
+        saved_env = {
+            var: os.environ.pop(var, None)
+            for var in (
+                "OTEL_RESOURCE_ATTRIBUTES",
+                "OTEL_EXPORTER_OTLP_HEADERS",
+                "OTEL_EXPORTER_OTLP_LOGS_HEADERS",
+            )
+        }
         try:
             sig.initialize_telemetry(
                 config=self._make_config(),
@@ -138,8 +152,9 @@ class AnacondaTelemetry:
                 signal_types=["logging"],
             )
         finally:
-            if resource_attributes is not None:
-                os.environ["OTEL_RESOURCE_ATTRIBUTES"] = resource_attributes
+            for var, value in saved_env.items():
+                if value is not None:
+                    os.environ[var] = value
 
     def send_event(
         self, event_name: str, body: str, attributes: dict[str, Any] | None = None
