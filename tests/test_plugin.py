@@ -580,7 +580,6 @@ def test_report_error_signal_payload_baseline(
         "os_type",
         "os_version",
         "python_version",
-        "hostname",
         "platform",
         "environment",
         "user_id",
