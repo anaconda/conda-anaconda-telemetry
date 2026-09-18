@@ -102,7 +102,7 @@ class AnacondaTelemetry:
 
     def _make_config(self) -> Configuration:
         config = Configuration(default_endpoint=self.default_endpoint)
-        # TODO(#236): Disable session IDs once the required SDK release is available.
+        config.set_disable_session_id(True)
         if "localhost" in self.default_endpoint.lower():
             # Set the configuration for test and development
             config.set_skip_internet_check(True)
@@ -110,9 +110,11 @@ class AnacondaTelemetry:
         return config
 
     def _make_attributes(self) -> ResourceAttributes:
-        # TODO(#236): Exclude hostname once the required SDK release is available.
         attributes = ResourceAttributes(
-            self.service_name, self.service_version, anon_usage=True
+            self.service_name,
+            self.service_version,
+            anon_usage=True,
+            exclude_auto_collect=["hostname"],
         )
         attributes.set_attributes(
             platform=self.platform,
