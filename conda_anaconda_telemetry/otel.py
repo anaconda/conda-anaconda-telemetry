@@ -8,12 +8,14 @@ import json
 import logging
 import os
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import anaconda_opentelemetry.signals as sig
+import requests.utils
 from anaconda_opentelemetry.attributes import ResourceAttributes
 from anaconda_opentelemetry.config import Configuration
 from conda.base.context import context
@@ -27,6 +29,7 @@ from conda_anaconda_telemetry.resource_attributes import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from typing import Any
 
     from conda.plugins.types import CondaExceptionEvent
@@ -48,6 +51,22 @@ LIST_BYTE_LIMIT = 500
 #: reach the payload.
 KNOWN_INSTALL_CHANNELS = frozenset({"defaults", "main", "main-x", "conda-forge"})
 OTHER_CHANNEL_LABEL = "other"
+
+
+@contextmanager
+def _ignore_otel_environment() -> Iterator[None]:
+    """Ignore native OTel settings while initializing or emitting an event."""
+    saved_env = {
+        var: os.environ.pop(var, None)
+        for var in tuple(os.environ)
+        if var.startswith("OTEL_")
+    }
+    try:
+        yield
+    finally:
+        for var, value in saved_env.items():
+            if value is not None:
+                os.environ[var] = value
 
 
 class Environment(Enum):
@@ -76,37 +95,37 @@ class AnacondaTelemetry:
     default_endpoint: str = field(init=False)
 
     def __post_init__(self) -> None:
-        """Set the default endpoint based on the environment.
+        """Use the production endpoint unless a local collector is selected.
 
-        If ATEL_DEFAULT_ENDPOINT is set, it will be used instead.
+        ATEL_ENVIRONMENT labels events without selecting a destination.
+        ATEL_DEFAULT_ENDPOINT can select a local HTTP collector for testing.
+        Other endpoint overrides are ignored.
         """
+        self.default_endpoint = "https://public.telemetry.anaconda.com/v1/logs"
+
         default_endpoint = os.getenv("ATEL_DEFAULT_ENDPOINT")
         if default_endpoint is not None:
-            self.default_endpoint = default_endpoint
-        elif self.environment.value == "staging":
-            self.default_endpoint = "https://metrics.stage.anacondaconnect.com/v1/logs"
-        elif self.environment.value in ("test", "development"):
-            self.default_endpoint = "http://localhost:4318"
-        else:
-            self.default_endpoint = "https://public.telemetry.anaconda.com/v1/logs"
-
-        parsed_endpoint = urlparse(self.default_endpoint)
-        if parsed_endpoint.scheme not in ("http", "https", "grpc"):
-            raise ValueError("A valid default endpoint must be set.")
-
-        if parsed_endpoint.scheme == "http" and parsed_endpoint.hostname not in (
-            "localhost",
-            "127.0.0.1",
-        ):
-            raise ValueError("A valid default endpoint must be set.")
+            parsed_endpoint = urlparse(default_endpoint)
+            if parsed_endpoint.scheme == "http" and parsed_endpoint.hostname in (
+                "localhost",
+                "127.0.0.1",
+            ):
+                self.default_endpoint = default_endpoint
 
     def _make_config(self) -> Configuration:
-        config = Configuration(default_endpoint=self.default_endpoint)
+        config = Configuration(
+            default_endpoint=self.default_endpoint,
+            ignore_environment_variables=True,
+        )
         config.set_disable_session_id(True)
-        if "localhost" in self.default_endpoint.lower():
-            # Set the configuration for test and development
+        # Use conda's own proxy config instead of ATEL_PROXY_URL.
+        config.set_proxy_url(
+            requests.utils.select_proxy(self.default_endpoint, context.proxy_servers)
+        )
+        if urlparse(self.default_endpoint).hostname in ("localhost", "127.0.0.1"):
+            # Local collectors do not need an internet connectivity check.
             config.set_skip_internet_check(True)
-            config.set_console_exporter(True)
+            config.set_console_exporter(False)
         return config
 
     def _make_attributes(self) -> ResourceAttributes:
@@ -130,16 +149,12 @@ class AnacondaTelemetry:
 
     def initialize(self) -> None:
         """Initialize telemetry."""
-        resource_attributes = os.environ.pop("OTEL_RESOURCE_ATTRIBUTES", None)
-        try:
+        with _ignore_otel_environment():
             sig.initialize_telemetry(
                 config=self._make_config(),
                 attributes=self._make_attributes(),
                 signal_types=["logging"],
             )
-        finally:
-            if resource_attributes is not None:
-                os.environ["OTEL_RESOURCE_ATTRIBUTES"] = resource_attributes
 
     def send_event(
         self, event_name: str, body: str, attributes: dict[str, Any] | None = None
@@ -150,11 +165,13 @@ class AnacondaTelemetry:
 
         logger.info("Sending a signal with event log data to the telemetry collector.")
 
-        result = sig.send_event(
-            event_name=event_name,
-            body=body,
-            attributes=attributes,
-        )
+        # OTel reads attribute limits again when constructing each log record.
+        with _ignore_otel_environment():
+            result = sig.send_event(
+                event_name=event_name,
+                body=body,
+                attributes=attributes,
+            )
 
         if result is True:
             logger.info("Event log sent successfully!")
