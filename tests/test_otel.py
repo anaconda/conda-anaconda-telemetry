@@ -40,8 +40,8 @@ TRUSTED_PROXY = "http://trusted-proxy.example.com:1234"
     [
         ("production", PRODUCTION_ENDPOINT),
         ("staging", PRODUCTION_ENDPOINT),
-        ("test", DUMMY_ENDPOINT),
-        ("development", DUMMY_ENDPOINT),
+        ("test", PRODUCTION_ENDPOINT),
+        ("development", PRODUCTION_ENDPOINT),
         ("", PRODUCTION_ENDPOINT),
     ],
 )
@@ -97,18 +97,19 @@ def test_atel_default_endpoint_falls_through_for_untrusted_values(
 @pytest.mark.parametrize(
     "environment,expected",
     [
-        ("development", True),
+        ("", False),
+        ("test", False),
+        ("development", False),
+        ("staging", False),
         ("production", False),
     ],
 )
 def test_make_config(
     monkeypatch: pytest.MonkeyPatch, environment: str, expected: bool
 ) -> None:
-    """Only a localhost endpoint skips the internet check and uses the
-    console exporter. ATEL_DEFAULT_ENDPOINT can no longer pick a non-loopback
-    endpoint (Task 1), so this now varies via ATEL_ENVIRONMENT instead.
-    """
+    """Environment labels do not enable local collector settings."""
     monkeypatch.setenv("ATEL_ENVIRONMENT", environment)
+    monkeypatch.delenv("ATEL_DEFAULT_ENDPOINT", raising=False)
 
     config = AnacondaTelemetry()._make_config()
 
@@ -346,7 +347,7 @@ def test_make_config_loopback_forms_behave_the_same(
 
     config = AnacondaTelemetry()._make_config()
 
-    assert config._get_console_exporter() is True
+    assert config._get_console_exporter() is False
     assert config._get_skip_internet_check() is True
 
 
@@ -372,8 +373,8 @@ def test_atel_logging_endpoint_env_var_does_not_override_pinned_endpoint(
     [
         ("production", PRODUCTION_ENDPOINT),
         ("staging", PRODUCTION_ENDPOINT),
-        ("test", DUMMY_ENDPOINT),
-        ("development", DUMMY_ENDPOINT),
+        ("test", PRODUCTION_ENDPOINT),
+        ("development", PRODUCTION_ENDPOINT),
         ("", PRODUCTION_ENDPOINT),
     ],
 )
@@ -382,10 +383,7 @@ def test_atel_environment_cannot_be_combined_with_atel_default_endpoint(
     environment: str,
     expected_default_endpoint: str,
 ) -> None:
-    """ATEL_ENVIRONMENT only ever selects among the fixed per-environment
-    URLs; combined with an attacker-chosen ATEL_DEFAULT_ENDPOINT it still
-    cannot pick an arbitrary destination.
-    """
+    """Environment labels cannot change the production fallback endpoint."""
     monkeypatch.setenv("ATEL_ENVIRONMENT", environment)
     monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", ATTACKER_ENDPOINT)
 
@@ -431,26 +429,44 @@ def test_otlp_header_env_vars_are_neutralized(
     assert "x-injected" not in exporter._session.headers
 
 
-def test_otel_resource_attributes_env_var_is_neutralized_during_init(
-    monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+@pytest.mark.parametrize(
+    "env_var,value",
+    [
+        ("OTEL_RESOURCE_ATTRIBUTES", "foo.bar=something"),
+        ("OTEL_SDK_DISABLED", "true"),
+        ("OTEL_EXPORTER_OTLP_LOGS_TIMEOUT", "123"),
+        ("OTEL_EXPORTER_OTLP_LOGS_CLIENT_CERTIFICATE", "synthetic-client.pem"),
+    ],
+)
+@pytest.mark.parametrize("initialization_fails", [False, True])
+def test_otel_env_vars_are_neutralized_during_init(
+    monkeypatch: pytest.MonkeyPatch,
+    mocker: MockerFixture,
+    env_var: str,
+    value: str,
+    initialization_fails: bool,
 ) -> None:
-    """OTEL_RESOURCE_ATTRIBUTES must be absent during SDK init, then
-    restored afterward for other tools that rely on it.
-    """
-    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "foo.bar=something")
+    """Restore inherited OTel settings after successful or failed initialization."""
+    monkeypatch.setenv(env_var, value)
     monkeypatch.setattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED", False)
 
     seen_during_init = []
 
     def _capture_env(*_args: object, **_kwargs: object) -> None:
-        seen_during_init.append(os.environ.get("OTEL_RESOURCE_ATTRIBUTES"))
+        seen_during_init.append(os.environ.get(env_var))
+        if initialization_fails:
+            raise RuntimeError("synthetic initialization failure")
 
     mocker.patch.object(sig, "initialize_telemetry", side_effect=_capture_env)
 
-    AnacondaTelemetry().initialize()
+    if initialization_fails:
+        with pytest.raises(RuntimeError, match="synthetic initialization failure"):
+            AnacondaTelemetry().initialize()
+    else:
+        AnacondaTelemetry().initialize()
 
     assert seen_during_init == [None]
-    assert os.environ["OTEL_RESOURCE_ATTRIBUTES"] == "foo.bar=something"
+    assert os.environ[env_var] == value
 
 
 @pytest.mark.parametrize(

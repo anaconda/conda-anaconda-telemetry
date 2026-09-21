@@ -77,16 +77,13 @@ class AnacondaTelemetry:
     default_endpoint: str = field(init=False)
 
     def __post_init__(self) -> None:
-        """Set the default endpoint based on the environment.
+        """Use the production endpoint unless a local collector is selected.
 
-        ATEL_DEFAULT_ENDPOINT can only pick a local http collector for testing;
-        any other value is ignored. ATEL_ENVIRONMENT never selects a remote
-        endpoint other than production — it is a label only.
+        ATEL_ENVIRONMENT labels events without selecting a destination.
+        ATEL_DEFAULT_ENDPOINT can select a local HTTP collector for testing.
+        Other endpoint overrides are ignored.
         """
-        if self.environment.value in ("test", "development"):
-            self.default_endpoint = "http://localhost:4318"
-        else:
-            self.default_endpoint = "https://public.telemetry.anaconda.com/v1/logs"
+        self.default_endpoint = "https://public.telemetry.anaconda.com/v1/logs"
 
         default_endpoint = os.getenv("ATEL_DEFAULT_ENDPOINT")
         if default_endpoint is not None:
@@ -108,9 +105,9 @@ class AnacondaTelemetry:
             requests.utils.select_proxy(self.default_endpoint, context.proxy_servers)
         )
         if urlparse(self.default_endpoint).hostname in ("localhost", "127.0.0.1"):
-            # Set the configuration for test and development
+            # Local collectors do not need an internet connectivity check.
             config.set_skip_internet_check(True)
-            config.set_console_exporter(True)
+            config.set_console_exporter(False)
         return config
 
     def _make_attributes(self) -> ResourceAttributes:
@@ -134,16 +131,12 @@ class AnacondaTelemetry:
 
     def initialize(self) -> None:
         """Initialize telemetry."""
-        # The OTLP exporter reads these headers directly from the
-        # environment, bypassing Configuration entirely, so
-        # ignore_environment_variables=True does not stop them.
+        # The native OTel provider and exporter read OTEL_* settings directly.
+        # Ignore them during initialization and restore them afterward.
         saved_env = {
             var: os.environ.pop(var, None)
-            for var in (
-                "OTEL_RESOURCE_ATTRIBUTES",
-                "OTEL_EXPORTER_OTLP_HEADERS",
-                "OTEL_EXPORTER_OTLP_LOGS_HEADERS",
-            )
+            for var in tuple(os.environ)
+            if var.startswith("OTEL_")
         }
         try:
             sig.initialize_telemetry(

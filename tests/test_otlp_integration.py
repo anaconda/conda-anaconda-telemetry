@@ -101,7 +101,6 @@ def test_real_otlp_payload_received_by_local_collector(
         "aau.anaconda_auth.token": "test-auth-token",
     }
 
-    # Avoid the localhost shortcut, which selects the console exporter.
     mocker.patch.dict(
         os.environ,
         {
@@ -123,7 +122,19 @@ def test_real_otlp_payload_received_by_local_collector(
         "conda_anaconda_telemetry.otel.context",
         SimpleNamespace(channel_priority="strict", proxy_servers={}),
     )
-    mocker.patch("anaconda_opentelemetry.config.Configuration.set_console_exporter")
+    mocker.patch.dict(
+        os.environ,
+        {
+            "OTEL_SDK_DISABLED": "true",
+            "OTEL_EXPORTER_OTLP_LOGS_TIMEOUT": "not-a-number",
+            "OTEL_EXPORTER_OTLP_LOGS_CLIENT_CERTIFICATE": str(
+                tmp_path / "unused-client-cert.pem"
+            ),
+            "OTEL_EXPORTER_OTLP_LOGS_CLIENT_KEY": str(
+                tmp_path / "unused-client-key.pem"
+            ),
+        },
+    )
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
