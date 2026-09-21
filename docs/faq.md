@@ -4,7 +4,7 @@
 
 When the `conda-anaconda-telemetry` plugin is installed in the conda base environment and enabled,
 the plugin will collect additional information about how conda is being used. This is then submitted
-to the channel servers that are currently configured via HTTP request headers.
+to the channel servers that are currently configured via HTTP request headers and OpenTelemetry (OTel).
 This allows channel owners to gain additional insights about how their channels are being used.
 
 ## What data is tracked by this plugin?
@@ -20,7 +20,7 @@ We currently collect the following information when this plugin is installed:
 - When `conda install` or `conda create` is run, we track the packages that are being installed that are
   specified at the command line (e.g. for the command `conda install package-a package-b`, `package-a` and
   `package-b` will be tracked)
-- Anonymized usage tokens provided by `anaconda-anon-usage` (e.g. a client token and a per-session token). For the exact fields that are exported - see [below](#ongoing-migration-to-use-otel).
+- Usage tokens provided by `anaconda-anon-usage` (e.g. a client token and a per-session token). For the exact fields that are exported - see [below](#ongoing-migration-to-use-otel).
 
 ## Which commands are you tracking?
 
@@ -53,18 +53,20 @@ compiled regular expression named `REQUEST_HEADER_PATTERN` which performs the
 matching. Limiting submission to these hosts avoids adding telemetry headers to
 unrelated third-party hosts.
 
-
 ## Telemetry data via OpenTelemetry
-There is an existing parallel approach handling data which relies on OpenTelemetry (OTel). OpenTelemetry - an open-source framework designed to standardize how telemetry data is handled). The OTel-based approach is gated behind the same setting as the headers.
+There is an existing parallel approach handling data which relies on OpenTelemetry (OTel). OpenTelemetry is an open-source framework designed to standardize how telemetry data is handled. The OTel-based approach is gated behind the same setting as the headers.
 
 The OTel based approach will replace the header-based approach in the future.
 
-Data handled via OTel are sent to Anaconda's servers, and only for the two conda commands `create` and `install`. Telemetry for these commands is only collected and exported when either command raise the exception `PackagesNotFoundInChannelsError` or when they succeed without any error. The exact signal can be observed in the test `tests/test_otlp_integration.py`. The data that is being export contain information about:
-- The installer (if it's a Miniconda or Anaconda Distribution installer).
+Data handled via OTel are sent to Anaconda's servers, and only for the two conda commands `create` and `install`. Telemetry for these commands is only collected and exported when either command raises the `PackagesNotFoundInChannelsError` exception (events `create.pnfe` and `install.pnfe`) or when they succeed without any error (events `create.success` and `install.success`). The data that is being export contain information about:
+- The installer used
 - Conda version
 - Operating system (type and version)
 - The requested command (filtered to exclude private information)
-- Requested and resolved packages
+- Requested packages
+- Resolved packages (during success events)
+- The Python version
+- Whether the operation is running on CI
 - Lastly, AAU tokens from the plugin `anaconda-anon-usage`
 
 Among the AAU tokens the following are persistent:
@@ -73,6 +75,7 @@ Among the AAU tokens the following are persistent:
 - `aau.organization.tokens`
 - `aau.installer.tokens`
 - `aau.machine.tokens`
+- `aau.version`
 
 The following are regenerated each run:
 - `aau.session.token`
