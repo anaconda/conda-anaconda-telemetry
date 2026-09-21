@@ -67,7 +67,10 @@ jobs:
 
   tests:
     needs: changes
-    if: github.event_name == 'schedule' || needs.changes.outputs.code == 'true'
+    if: >-
+      github.event_name == 'schedule'
+      || github.event_name == 'workflow_dispatch'
+      || needs.changes.outputs.code == 'true'
 
     defaults:
       run:
@@ -217,7 +220,10 @@ jobs:
 
   build_docs:
     needs: changes
-    if: github.event_name == 'schedule' || needs.changes.outputs.code == 'true'
+    if: >-
+      github.event_name == 'schedule'
+      || github.event_name == 'workflow_dispatch'
+      || needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     steps:
