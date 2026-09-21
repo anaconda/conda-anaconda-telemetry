@@ -115,6 +115,22 @@ jobs:
             conda-version: '25.9'
           - os: macos-15-intel
             conda-version: '25.11'
+        include:
+          # Current stable conda and Python across supported operating systems
+          - os: ubuntu-latest
+            python-version: '3.14'
+            conda-version: '26.7'
+          - os: windows-latest
+            python-version: '3.14'
+            conda-version: '26.7'
+          - os: macos-latest
+            python-version: '3.14'
+            conda-version: '26.7'
+          # Reproduce conda/conda#16726 against the development canary
+          - os: ubuntu-latest
+            python-version: '3.14'
+            conda-version: 26.9-canary
+            conda-spec: conda-canary/label/dev::conda
     runs-on: ${{ matrix.os }}
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
@@ -154,7 +170,7 @@ jobs:
           --file tests/requirements.txt
           --file tests/requirements-ci.txt
           python=${{ matrix.python-version }}
-          conda=${{ matrix.conda-version }}
+          ${{ matrix.conda-spec || format('conda={0}', matrix.conda-version) }}
 
       # TODO: how can we remove this step?
       - name: Install Self
@@ -163,6 +179,22 @@ jobs:
       - name: Conda Info
         # view test env info (not base)
         run: python -m conda info --verbose
+
+      - name: Check Entry Point Loading
+        shell: python
+        run: |
+          import subprocess
+
+          result = subprocess.run(
+              ["python", "-m", "conda", "env", "list"],
+              capture_output=True,
+              check=True,
+              text=True,
+          )
+          output = result.stdout + result.stderr
+          print(output)
+          if "Error while loading conda entry point" in output:
+              raise SystemExit("conda failed to load a plugin entry point")
 
       - name: Conda Config
         run: conda config --show-sources
