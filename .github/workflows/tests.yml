@@ -181,20 +181,21 @@ jobs:
         run: python -m conda info --verbose
 
       - name: Check Entry Point Loading
-        shell: python
         run: |
+          python - <<'PY'
           import subprocess
 
           result = subprocess.run(
               ["python", "-m", "conda", "env", "list"],
               capture_output=True,
-              check=True,
               text=True,
           )
           output = result.stdout + result.stderr
           print(output)
           if "Error while loading conda entry point" in output:
               raise SystemExit("conda failed to load a plugin entry point")
+          raise SystemExit(result.returncode)
+          PY
 
       - name: Conda Config
         run: conda config --show-sources
