@@ -20,7 +20,7 @@ We currently collect the following information when this plugin is installed:
 - When `conda install` or `conda create` is run, we track the packages that are being installed that are
   specified at the command line (e.g. for the command `conda install package-a package-b`, `package-a` and
   `package-b` will be tracked)
-- Anonymized usage tokens provided by `anaconda-anon-usage` (e.g. a client token and a per-session token)
+- Anonymized usage tokens provided by `anaconda-anon-usage` (e.g. a client token and a per-session token). For the exact fields that are exported - see [below](#ongoing-migration-to-use-otel).
 
 ## Which commands are you tracking?
 
@@ -52,3 +52,30 @@ This behavior is implemented in `conda_anaconda_telemetry/hooks.py` via a
 compiled regular expression named `REQUEST_HEADER_PATTERN` which performs the
 matching. Limiting submission to these hosts avoids adding telemetry headers to
 unrelated third-party hosts.
+
+
+## Telemetry data via OpenTelemetry
+There is an existing parallel approach handling data which relies on OpenTelemetry (OTel). OpenTelemetry - an open-source framework designed to standardize how telemetry data is handled). The OTel-based approach is gated behind the same setting as the headers.
+
+The OTel based approach will replace the header-based approach in the future.
+
+Data handled via OTel are sent to Anaconda's servers, and only for the two conda commands `create` and `install`. Telemetry for these commands is only collected and exported when either command raise the exception `PackagesNotFoundInChannelsError` or when they succeed without any error. The exact signal can be observed in the test `tests/test_otlp_integration.py`. The data that is being export contain information about:
+- The installer (if it's a Miniconda or Anaconda Distribution installer).
+- Conda version
+- Operating system (type and version)
+- The requested command (filtered to exclude private information)
+- Requested and resolved packages
+- Lastly, AAU tokens from the plugin `anaconda-anon-usage`
+
+Among the AAU tokens the following are persistent:
+- `aau.client.token`
+- `aau.environment.token`
+- `aau.organization.tokens`
+- `aau.installer.tokens`
+- `aau.machine.tokens`
+
+The following are regenerated each run:
+- `aau.session.token`
+
+Lastly, the following are account-linked:
+- `aau.anaconda_auth.token`
