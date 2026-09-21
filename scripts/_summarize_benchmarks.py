@@ -37,8 +37,12 @@ def main() -> None:
         rows.append(
             (
                 label,
-                f"{disabled['mean']:.3f} ± {disabled['stddev']:.3f}",
-                f"{enabled['mean']:.3f} ± {enabled['stddev']:.3f}",
+                f"{disabled['mean']:.3f} ± {disabled['stddev']:.3f}"
+                if disabled["stddev"] is not None
+                else f"{disabled['mean']:.3f}",
+                f"{enabled['mean']:.3f} ± {enabled['stddev']:.3f}"
+                if enabled["stddev"] is not None
+                else f"{enabled['mean']:.3f}",
                 f"{overhead_pct:+.1f}%",
             )
         )

@@ -95,7 +95,9 @@ BENCH_PREFIX="${BENCH_ROOT}/cat-bench"
 # hyperfine runs each command in a plain shell that hasn't set up conda, so
 # `conda` would fail. Source the shell hook and activate the base env (where
 # conda-anaconda-telemetry is installed) in every command and --prepare step.
-CONDA_INIT="source \"$HOME/miniconda3/etc/profile.d/conda.sh\" && conda activate base &&"
+CONDA_BASE=$(conda info --base)
+printf -v CONDA_INIT 'source %q && conda activate base &&' \
+  "${CONDA_BASE}/etc/profile.d/conda.sh"
 
 JSON_DIR=$(mktemp -d)
 trap 'rm -rf "$JSON_DIR" "$BENCH_ROOT"' EXIT
