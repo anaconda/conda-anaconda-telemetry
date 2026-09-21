@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -28,6 +29,7 @@ from conda_anaconda_telemetry.resource_attributes import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from typing import Any
 
     from conda.plugins.types import CondaExceptionEvent
@@ -49,6 +51,22 @@ LIST_BYTE_LIMIT = 500
 #: reach the payload.
 KNOWN_INSTALL_CHANNELS = frozenset({"defaults", "main", "main-x", "conda-forge"})
 OTHER_CHANNEL_LABEL = "other"
+
+
+@contextmanager
+def _ignore_otel_environment() -> Iterator[None]:
+    """Ignore native OTel settings while initializing or emitting an event."""
+    saved_env = {
+        var: os.environ.pop(var, None)
+        for var in tuple(os.environ)
+        if var.startswith("OTEL_")
+    }
+    try:
+        yield
+    finally:
+        for var, value in saved_env.items():
+            if value is not None:
+                os.environ[var] = value
 
 
 class Environment(Enum):
@@ -131,23 +149,12 @@ class AnacondaTelemetry:
 
     def initialize(self) -> None:
         """Initialize telemetry."""
-        # The native OTel provider and exporter read OTEL_* settings directly.
-        # Ignore them during initialization and restore them afterward.
-        saved_env = {
-            var: os.environ.pop(var, None)
-            for var in tuple(os.environ)
-            if var.startswith("OTEL_")
-        }
-        try:
+        with _ignore_otel_environment():
             sig.initialize_telemetry(
                 config=self._make_config(),
                 attributes=self._make_attributes(),
                 signal_types=["logging"],
             )
-        finally:
-            for var, value in saved_env.items():
-                if value is not None:
-                    os.environ[var] = value
 
     def send_event(
         self, event_name: str, body: str, attributes: dict[str, Any] | None = None
@@ -158,11 +165,13 @@ class AnacondaTelemetry:
 
         logger.info("Sending a signal with event log data to the telemetry collector.")
 
-        result = sig.send_event(
-            event_name=event_name,
-            body=body,
-            attributes=attributes,
-        )
+        # OTel reads attribute limits again when constructing each log record.
+        with _ignore_otel_environment():
+            result = sig.send_event(
+                event_name=event_name,
+                body=body,
+                attributes=attributes,
+            )
 
         if result is True:
             logger.info("Event log sent successfully!")

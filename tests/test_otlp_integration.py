@@ -126,6 +126,8 @@ def test_real_otlp_payload_received_by_local_collector(
         os.environ,
         {
             "OTEL_SDK_DISABLED": "true",
+            "OTEL_ATTRIBUTE_COUNT_LIMIT": "0",
+            "OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT": "1",
             "OTEL_EXPORTER_OTLP_LOGS_TIMEOUT": "not-a-number",
             "OTEL_EXPORTER_OTLP_LOGS_CLIENT_CERTIFICATE": str(
                 tmp_path / "unused-client-cert.pem"
@@ -148,6 +150,8 @@ def test_real_otlp_payload_received_by_local_collector(
     )
     plugin_module.report_error(event)
     assert os.environ["OTEL_RESOURCE_ATTRIBUTES"] == "foo.bar=something"
+    assert os.environ["OTEL_ATTRIBUTE_COUNT_LIMIT"] == "0"
+    assert os.environ["OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT"] == "1"
 
     # Export is asynchronous. Flush this test's logger because the global
     # provider may belong to telemetry initialized by another test.
