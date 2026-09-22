@@ -365,7 +365,7 @@ $packageUri = ([System.Uri]::new((Resolve-Path $packagePath).Path)).AbsoluteUri
 conda install -y --force-reinstall -n qa-s1 $packageUri
 ```
 
-Verify the local-file installation completes and emits no event (this confirm that package URLs are not reported as requested package names). Then run `conda install -y -n qa-s1 -c defaults defaults::xz`; verify an event is emitted and `requested.packages` contains bare name `xz`.
+Verify the local-file installation completes and emits no event (this confirms that package URLs are not reported as requested package names). Then run `conda install -y -n qa-s1 -c defaults defaults::xz`; verify an event is emitted and `requested.packages` contains bare name `xz`.
 
 #### S8 - No success event without installation or solve
 
