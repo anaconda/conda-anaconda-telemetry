@@ -95,6 +95,7 @@ KNOWN_PUBLIC_CHANNEL_URLS = frozenset(
         "https://conda.anaconda.org/msys2",
         "https://conda.anaconda.org/r",
         "https://repo.anaconda.com/pkgs/main",
+        "https://repo.anaconda.com/pkgs/msys2",
         "https://repo.anaconda.com/pkgs/r",
         "https://repo.anaconda.cloud/main-x",
     }
