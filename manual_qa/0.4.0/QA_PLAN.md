@@ -2,7 +2,7 @@
 
 **Submitted by**: Robin Andersson
 
-**Date**: [16/09/2026]
+**Date**: [22/09/2026]
 
 ## 1. Feature/Package Overview
 
@@ -12,7 +12,7 @@
 
 **Brief Description**:
 
-`conda-anaconda-telemetry` is a conda plugin that sends usage data to Anaconda. This release adds a new, separate way of sending that data (using a standard called OpenTelemetry). It sends one report (signal) each time `conda install` or `conda create` succeeds, or fails because a package wasn't found (an error called `PackagesNotFoundInChannelsError`, or "PNFE" for short).
+`conda-anaconda-telemetry` is a conda plugin that sends usage data to Anaconda. This release adds a new, separate way of sending that data (using a standard called OpenTelemetry). It sends one report (signal) each time `conda install` or `conda create` succeeds, or fails because a package wasn't found (an error called `PackagesNotFoundInChannelsError`, or "PNFE" for short). `conda create --clone` and `@EXPLICIT` installations are an exception: they complete successfully but do not emit a success report in 0.4.0 (see Known Issues & Limitations).
 
 ## 2. System Requirements
 
@@ -30,11 +30,11 @@
 ```
 python >=3.10
 conda >=26.7.2
-anaconda-opentelemetry >=1.2.2
+anaconda-opentelemetry >=1.2.4
 conda-anaconda-telemetry 0.4.0 canary (installed in the base environment)
 ```
 
-* Other Requirements: Internet access; approximately 2 GB of free disk space for temporary environments; `Docker` for the local collector test in S15.
+* Other Requirements: Internet access; approximately 2 GB of free disk space for temporary environments; `Docker` for the local collector.
 
 ## 3. Installation Steps
 
@@ -84,7 +84,7 @@ conda info
 # Confirm package versions.
 conda --version                                      # expected: 26.7.2
 conda list -n base conda-anaconda-telemetry          # expected: a canary version with a Git hash
-conda list -n base anaconda-opentelemetry            # expected: 1.2.2 or newer
+conda list -n base anaconda-opentelemetry            # expected: 1.2.4 or newer
 
 # Confirm that the plugin is registered and enabled.
 conda config --describe plugins.anaconda_telemetry   # expected: default value True
@@ -101,20 +101,18 @@ Attach `conda-qa-base-explicit.txt` to the QA results for each platform. This re
 
 | Variable | Purpose |
 | --- | --- |
-| `ATEL_ENVIRONMENT` | Selects `production` (default), `staging`, `development`, or `test`. `development` and `test` use `http://localhost:4318`. |
-| `ATEL_DEFAULT_ENDPOINT` | Overrides the collector endpoint. Accepted values use `https://` or `grpc://`, or `http://` with `localhost` or `127.0.0.1`. |
+| `ATEL_ENVIRONMENT` | Labels the signal as `production` (default), `staging`, `development`, or `test`. It does not select or change the destination endpoint. |
+| `ATEL_DEFAULT_ENDPOINT` | Only takes effect when set to an `http://` URL with host `localhost` or `127.0.0.1`; that value is used as the collector endpoint. Any other value (a remote host, `https://`, `grpc://`, or a malformed URL) is ignored, and telemetry falls back to the production endpoint. |
 | `CONDA_PLUGINS_ANACONDA_TELEMETRY` | Overrides the conda setting; `false` disables the plugin for one command. |
 
-Use Mode A for S1-S14 and S16. Use Mode B only for S15.
+QA uses one setup for every scenario: a local OpenTelemetry collector running in Docker. "OpenTelemetry" (OTel) is the reporting standard this plugin uses; the "collector" is a small local server that receives and prints each signal so QA can inspect it. Two terminals are used throughout testing:
 
-**Mode A - console exporter (no container):** A `localhost` endpoint makes the SDK print the signal to stdout without sending it over the network.
+1. **Collector terminal** - starts the Docker collector and stays open. Every received signal is printed here.
+2. **Conda terminal** - sets the local endpoint and runs all conda test commands.
 
-```shell
-export ATEL_ENVIRONMENT=development
-# PowerShell: $env:ATEL_ENVIRONMENT = "development"
-```
+Always check and save signal output from the collector terminal, not the conda terminal.
 
-**Mode B - local OpenTelemetry collector (Docker):** Create `otel-collector.yaml`:
+Create `otel-collector.yaml`:
 
 ```yaml
 receivers:
@@ -131,34 +129,37 @@ service:
       receivers: [otlp]
       exporters: [debug]
 ```
-Ensure that `docker` is running before you run any `docker` command below. Note that we use 2 separate terminals to do this.
+Ensure that `docker` is running before you run any `docker` command below.
+
 ```shell
-# Terminal 1 (Linux/macOS): run the collector and watch its output.
+# Collector terminal (Linux/macOS): run the collector and watch its output.
 docker run --rm -p 4318:4318 \
   -v "$PWD/otel-collector.yaml:/etc/otelcol/config.yaml" \
   otel/opentelemetry-collector:latest
 
-# Terminal 2: configure the plugin.
+# Conda terminal: configure the plugin to send signals to the local collector.
 export ATEL_DEFAULT_ENDPOINT=http://127.0.0.1:4318
-export ATEL_ENVIRONMENT=development
+export ATEL_ENVIRONMENT=test
 ```
 
 ```powershell
-# Terminal 1 (Windows PowerShell): run the collector and watch its output.
+# Collector terminal (Windows PowerShell): run the collector and watch its output.
 docker run --rm -p 4318:4318 `
   -v "${PWD}\otel-collector.yaml:/etc/otelcol/config.yaml" `
   otel/opentelemetry-collector:latest
 
-# Terminal 2: configure the plugin.
+# Conda terminal: configure the plugin to send signals to the local collector.
 $env:ATEL_DEFAULT_ENDPOINT = "http://127.0.0.1:4318"
-$env:ATEL_ENVIRONMENT = "development"
+$env:ATEL_ENVIRONMENT = "test"
 ```
+
+`ATEL_ENVIRONMENT=test` only labels the captured QA signals as test data; it does not select or enable the local collector. `ATEL_DEFAULT_ENDPOINT` is what points the plugin at the local collector.
 
 ### Setup Instructions
 
 1. Complete section 3, including verification.
-2. Configure Mode A and keep it active unless a scenario says otherwise.
-3. Run scenarios from base and store each signal (outputted as JSON) as evidence.
+2. Configure the conda terminal as shown above and keep both terminals open throughout testing, unless a scenario says otherwise.
+3. Run scenarios from base and store each signal (as shown in the collector terminal) as evidence.
 
 ## 5. Impacted Areas
 
@@ -169,12 +170,12 @@ conda_anaconda_telemetry/otel.py                  # SDK configuration, event att
 conda_anaconda_telemetry/plugin.py                # Command state and success/PNFE reporting
 conda_anaconda_telemetry/resource_attributes.py   # conda.* and installer.* resource attributes
 conda_anaconda_telemetry/hooks.py                 # conda hook registration
-recipe/meta.yaml, pyproject.toml                  # anaconda-opentelemetry >=1.2.2 dependency
+recipe/meta.yaml, pyproject.toml                  # anaconda-opentelemetry >=1.2.4 dependency
 ```
 
 ### Modules/Components Affected
 
-* **When telemetry runs** - The plugin now watches `create` and `install` commands at several points (before/after they run, and if they fail) to send telemetry. No other conda commands are watched.
+* **When telemetry runs** - The plugin now watches `create` and `install` commands at several points (before/after they run, and if they fail) to send telemetry. No other conda commands are watched for OTel.
 * **What gets sent** - A new type of report is added on top of the existing one that was already being sent. Think of it as a second, separate delivery of usage data.
 * **What doesn't change** - conda still behaves exactly the same way (same messages, same exit codes) whether or not this new reporting works.
 
@@ -182,7 +183,7 @@ recipe/meta.yaml, pyproject.toml                  # anaconda-opentelemetry >=1.2
 
 ### Expected Behavior
 
-Each command should send exactly one report: a "success" report if it works, or a "not found" report if it fails because a package doesn't exist. If sending the report itself fails, that must NOT cause any visible error, crash, or change to conda's normal behavior.
+Each command should send exactly one report: a "success" report if it works, or a "not found" report if it fails because a package doesn't exist. If sending the report itself fails, that must NOT cause any visible error, crash, or change to conda's normal behavior. The exceptions are `conda create --clone` and `@EXPLICIT` installations, which send no report at all despite completing successfully (more on that in S8).
 
 For every scenario below, unless stated otherwise, check that:
 - **Exactly one** report was sent.
@@ -207,7 +208,7 @@ A "success" report includes what packages were requested and what was actually i
 | `exception.missing_specs` | PNFE only: missing package names |
 | `truncated` | `true` if the list of packages was too long and got cut off (max 50 items, or 500 bytes of data, whichever comes first) |
 
-The report also includes some general info about the system: the plugin's own name/version, whether it's running in CI, the OS type/version, the Python version, a random session ID, an anonymized (hashed) hostname, and some internal tracking tokens (`aau.*`). If the installer was made with a recent enough tool (constructor 3.16.0+), it also includes the installer's name, version, and platform.
+The report also includes some general info about the system: the plugin's own name/version, whether it's running in CI, the OS type/version, the Python version, and some internal tracking tokens (`aau.*`). It does NOT include a session ID or a hostname. If the installer was made with a recent enough tool (`constructor>=3.16.0`), it also includes the installer's name, version, and platform.
 
 ### Test Scenarios to Cover
 
@@ -217,7 +218,7 @@ The report also includes some general info about the system: the plugin's own na
 conda create -y -n qa-s1 -c defaults python=3.12
 ```
 
-Once the command above finishes you should see the signal being sent to your terminal. Verify one `create.success` event with (see the nested `attributes` field) `command` `create`, `install.channels` `['defaults']`, `install.channel_priority` `flexible`, `requested.packages` `['python']`, and `resolved.packages` containing Python and all linked dependencies. Verify all applicable resource attributes.
+Once the command above finishes, check the collector terminal for the signal it received. Verify one `create.success` event with (see the nested `attributes` field) `command` `create`, `install.channels` `['defaults']`, `install.channel_priority` `flexible`, `requested.packages` `['python']`, and `resolved.packages` containing Python and all linked dependencies. Verify all applicable resource attributes.
 
 #### S2 - `install.success`
 
@@ -245,15 +246,36 @@ Verify the S3 PNFE shape with `log.event.name` `create.pnfe` and `command` `crea
 
 #### S5 - Opt-out
 
+This scenario uses a temporary QA-only conda configuration file so it never changes the tester's normal `.condarc`. Point `CONDARC` at that file only for the S5 commands below, then restore it.
+
 ```shell
-conda config --set plugins.anaconda_telemetry false
-conda create -y -n qa-s5 -c defaults zlib
-conda create -n qa-s5b --dry-run -c defaults definitely-not-a-real-package-xyz
-conda config --set plugins.anaconda_telemetry true
-conda create -n qa-s5c --dry-run -c defaults definitely-not-a-real-package-xyz
+# Linux and macOS
+qa_condarc=/tmp/conda-telemetry-qa-condarc
+saved_condarc="${CONDARC-}"
+conda config --file "$qa_condarc" --set plugins.anaconda_telemetry false
+CONDARC="$qa_condarc" conda create -y -n qa-s5 -c defaults zlib
+CONDARC="$qa_condarc" conda create -n qa-s5b --dry-run -c defaults definitely-not-a-real-package-xyz
+conda config --file "$qa_condarc" --set plugins.anaconda_telemetry true
+CONDARC="$qa_condarc" conda create -n qa-s5c --dry-run -c defaults definitely-not-a-real-package-xyz
+if [ -n "$saved_condarc" ]; then export CONDARC="$saved_condarc"; else unset CONDARC; fi
+rm -f "$qa_condarc"
 ```
 
-Verify that the `qa-s5` success command and the `qa-s5b` PNFE command emit no events while `plugins.anaconda_telemetry` is `false`. After resetting the setting to `true`, verify the `qa-s5c` command emits one `create.pnfe` event.
+```powershell
+# Windows PowerShell
+$qaCondarc = Join-Path $env:TEMP "conda-telemetry-qa-condarc"
+$savedCondarc = $env:CONDARC
+conda config --file $qaCondarc --set plugins.anaconda_telemetry false
+$env:CONDARC = $qaCondarc
+conda create -y -n qa-s5 -c defaults zlib
+conda create -n qa-s5b --dry-run -c defaults definitely-not-a-real-package-xyz
+conda config --file $qaCondarc --set plugins.anaconda_telemetry true
+conda create -n qa-s5c --dry-run -c defaults definitely-not-a-real-package-xyz
+if ($savedCondarc) { $env:CONDARC = $savedCondarc } else { Remove-Item Env:CONDARC }
+Remove-Item $qaCondarc
+```
+
+Verify that the `qa-s5` success command and the `qa-s5b` PNFE command emit no events (check the collector terminal) while `plugins.anaconda_telemetry` is `false` in the QA configuration file. After resetting that file's setting to `true`, verify the `qa-s5c` command emits one `create.pnfe` event in the collector terminal. Confirm the tester's normal `.condarc` and any pre-existing `CONDARC` value are unchanged afterward.
 
 Verify the environment-variable override disables telemetry for one command without changing the saved configuration:
 
@@ -269,7 +291,7 @@ conda create -n qa-s5d --dry-run -c defaults definitely-not-a-real-package-xyz
 Remove-Item Env:CONDA_PLUGINS_ANACONDA_TELEMETRY
 ```
 
-Verify the `qa-s5d` command emits no event. Then rerun it without the environment-variable override and verify one `create.pnfe` event, confirming the saved `true` configuration remains active.
+Verify the `qa-s5d` command emits no event. Then rerun it without the environment-variable override and verify one `create.pnfe` event in the collector terminal, confirming the saved `true` configuration remains active.
 
 #### S6 - Channel allow-list and privacy
 
@@ -279,27 +301,22 @@ conda create -n qa-s6 --dry-run -c bioconda -c conda-forge -c defaults definitel
 
 Check that `install.channels` shows `['other', 'conda-forge', 'defaults']` - since `bioconda` isn't on the approved list, it's replaced with `other` (but the order stays the same).
 
-Next, do the same test using a local folder pretending to be a channel instead of a real one online. The steps below create some empty test files so conda thinks this folder is a valid channel.
+Next, do the same test using a local folder pretending to be a channel instead of a real one online. Create a folder with the following structure, where each `repodata.json` file contains empty package listings:
 
-```shell
-# Linux and macOS
-mkdir -p /tmp/local-channel/noarch /tmp/local-channel/linux-64 /tmp/local-channel/osx-arm64
-printf '{"packages":{},"packages.conda":{}}\n' > /tmp/local-channel/noarch/repodata.json
-printf '{"packages":{},"packages.conda":{}}\n' > /tmp/local-channel/linux-64/repodata.json
-printf '{"packages":{},"packages.conda":{}}\n' > /tmp/local-channel/osx-arm64/repodata.json
-conda create -n qa-s6-file --dry-run -c file:///tmp/local-channel -c conda-forge -c defaults definitely-not-a-real-package-xyz
-```
+- `<local-channel>/noarch/repodata.json`
+- `<local-channel>/linux-64/repodata.json` (Linux/macOS only)
+- `<local-channel>/osx-arm64/repodata.json` (macOS only)
+- `<local-channel>/win-64/repodata.json` (Windows only)
 
-```powershell
-# Windows PowerShell
-$channel = Join-Path $env:TEMP "qa-local-channel"
-New-Item -ItemType Directory -Force (Join-Path $channel "noarch"), (Join-Path $channel "win-64") | Out-Null
-$emptyRepodata = '{"packages":{},"packages.conda":{}}'
-[System.IO.File]::WriteAllText((Join-Path $channel "noarch\repodata.json"), $emptyRepodata)
-[System.IO.File]::WriteAllText((Join-Path $channel "win-64\repodata.json"), $emptyRepodata)
-$channelUri = ([System.Uri]::new("$channel\")).AbsoluteUri.TrimEnd('/')
-conda create -n qa-s6-file --dry-run -c $channelUri -c conda-forge -c defaults definitely-not-a-real-package-xyz
-```
+Each `repodata.json` file should contain:
+
+    {"packages":{},"packages.conda":{}}
+
+Then run:
+
+    conda create -n qa-s6-file --dry-run -c file:///path/to/local-channel -c conda-forge -c defaults definitely-not-a-real-package-xyz
+
+(On Windows, use the `file:///` URI form of the local path, e.g. `file:///C:/Users/you/AppData/Local/Temp/qa-local-channel`.)
 
 Confirm the local folder is also reported as `other`, and that no folder path, web address, or private info shows up anywhere in the report. Also confirm the command emits `create.pnfe`.
 
@@ -350,7 +367,7 @@ conda install -y --force-reinstall -n qa-s1 $packageUri
 
 Verify the local-file installation completes and emits no event (this confirm that package URLs are not reported as requested package names). Then run `conda install -y -n qa-s1 -c defaults defaults::xz`; verify an event is emitted and `requested.packages` contains bare name `xz`.
 
-#### S8 - No success event without installation
+#### S8 - No success event without installation or solve
 
 ```shell
 conda install -y -n qa-s1 -c defaults --dry-run xz
@@ -358,6 +375,16 @@ conda install -y -n qa-s1 -c defaults --download-only xz
 ```
 
 Verify both commands complete **without** an `install.success` event.
+
+`conda create --clone` and `conda create --file` with an `@EXPLICIT` package list both bypass conda's solve step. Because no solve happens, the plugin never captures requested or resolved packages, so `create.success` is not emitted, even though the command completes successfully. This is a known, confirmed 0.4.0 behavior tracked in [#246](https://github.com/anaconda/conda-anaconda-telemetry/issues/246), not a bug to file.
+
+```shell
+conda create -y -n qa-s8-clone --clone qa-s1
+conda list -n qa-s1 --explicit > qa-s1-explicit.txt
+conda create -y -n qa-s8-explicit --file qa-s1-explicit.txt
+```
+
+Verify both `conda create` commands complete successfully (the clone and the environment match) and that neither emits a `create.success` event.
 
 #### S9 - List truncation
 
@@ -411,61 +438,25 @@ Verify `remove`, `update`, `search`, and `list` emit no OTel event. With `conda 
 
 #### S12 - Collector unreachable or offline
 
-```shell
-# Linux and macOS
-ATEL_DEFAULT_ENDPOINT=http://127.0.0.1:4999 conda create -n qa-s12 --dry-run -c defaults definitely-not-a-real-package-xyz
-```
-
-```powershell
-# Windows PowerShell
-$env:ATEL_DEFAULT_ENDPOINT = "http://127.0.0.1:4999"
-conda create -n qa-s12 --dry-run -c defaults definitely-not-a-real-package-xyz
-Remove-Item Env:ATEL_DEFAULT_ENDPOINT
-```
-
-With no service on port 4999, verify normal PNFE output and exit code, no traceback or noticeable delay compared with telemetry disabled, and no hang. One `Anaconda OpenTelemetry: No access to the endpoint...` line on stderr is expected.
-
-Then repeat with an address that silently drops packets instead of refusing the connection, to confirm the plugin also handles a timeout rather than an immediate refusal:
-
-```shell
-# Linux and macOS
-ATEL_DEFAULT_ENDPOINT=https://192.0.2.1:4999 conda create -n qa-s12b --dry-run -c defaults definitely-not-a-real-package-xyz
-```
-
-```powershell
-# Windows PowerShell
-$env:ATEL_DEFAULT_ENDPOINT = "https://192.0.2.1:4999"
-conda create -n qa-s12b --dry-run -c defaults definitely-not-a-real-package-xyz
-Remove-Item Env:ATEL_DEFAULT_ENDPOINT
-```
-
-Verify the same normal PNFE output and exit code, and that conda finishes within a few seconds rather than hanging (see Performance Considerations).
+This is covered by existing automated tests and is not manually exercised in this QA pass: `tests/test_plugin.py` (for example `test_report_error_send_event_failure_is_consumed` and `test_report_success_send_event_failure_is_consumed`) verifies that a failure to send a signal is consumed rather than raised, so it cannot affect conda's normal behavior.
 
 #### S13 - Invalid telemetry configuration
 
 ```shell
 # Linux and macOS
 ATEL_ENVIRONMENT=bogus conda create -n qa-s13 --dry-run -c defaults definitely-not-a-real-package-xyz
-ATEL_DEFAULT_ENDPOINT=http://example.com:4318 conda create -n qa-s13 --dry-run -c defaults definitely-not-a-real-package-xyz
-ATEL_DEFAULT_ENDPOINT=not-a-url conda create -y -n qa-s13 -c defaults zlib
 ```
 
 ```powershell
 # Windows PowerShell
 $env:ATEL_ENVIRONMENT = "bogus"
 conda create -n qa-s13 --dry-run -c defaults definitely-not-a-real-package-xyz
-$env:ATEL_ENVIRONMENT = "development"  # restore Mode A
-
-$env:ATEL_DEFAULT_ENDPOINT = "http://example.com:4318"
-conda create -n qa-s13 --dry-run -c defaults definitely-not-a-real-package-xyz
-Remove-Item Env:ATEL_DEFAULT_ENDPOINT
-
-$env:ATEL_DEFAULT_ENDPOINT = "not-a-url"
-conda create -y -n qa-s13 -c defaults zlib
-Remove-Item Env:ATEL_DEFAULT_ENDPOINT
+$env:ATEL_ENVIRONMENT = "test"
 ```
 
-Verify each command has the same output and exit code as telemetry-disabled execution, emits no event, and prints no traceback. The plugin must reject plain HTTP except for `localhost` and `127.0.0.1`, and reject malformed URLs.
+Verify the `qa-s13` command has the same output and exit code as telemetry-disabled execution, emits no event, and prints no traceback (`bogus` is not a recognized `ATEL_ENVIRONMENT` label).
+
+A remote or malformed `ATEL_DEFAULT_ENDPOINT` value is ignored rather than rejected, and telemetry then falls back to the **production** endpoint - not to the local collector. Because a successful command in that state would send a real event to production, do not run this manually. This ignored-endpoint behavior is covered by the automated tests in `tests/test_otel.py` (for example `test_atel_default_endpoint_falls_through_for_untrusted_values`).
 
 #### S14 - Installer attributes
 
@@ -496,13 +487,9 @@ Move-Item -Force "$installerInfo.qa-backup" $installerInfo
 
 Verify the invalid JSON does not prevent the event and simply omits all three `installer.*` attributes. If the file is absent, record that the installer may predate constructor 3.16.0.
 
-#### S15 - Local collector export (Mode B)
+#### S15 - Cross-platform matrix
 
-Switch to Mode B and repeat S1-S4. For each command, check the collector's output (Terminal 1) instead of the terminal where you ran the `conda` command: verify it shows exactly one decoded log record with the same attributes as Mode A. This confirms events are actually sent over the network to a collector, not just printed locally.
-
-#### S16 - Cross-platform matrix
-
-Repeat S1-S5 and S12 on Windows 11, macOS arm64, and Linux x86_64. Verify `os.type`, `os.version`, and `python.version` match.
+Repeat S1-S5 on Windows 11, macOS arm64, and Linux x86_64. Verify `os.type`, `os.version`, and `python.version` match.
 
 ### User Roles/Permissions to Test
 
@@ -511,24 +498,26 @@ Repeat S1-S5 and S12 on Windows 11, macOS arm64, and Linux x86_64. Verify `os.ty
 
 ## 7. Known Issues & Limitations
 
-* The signal still contains `hostname` and `session.id` in resource attributes pending [#236](https://github.com/anaconda/conda-anaconda-telemetry/issues/236); SDK 1.2.2 hashes `hostname`. This is expected, not a privacy bug.
 * Only `PackagesNotFoundInChannelsError` is reported; `UnsatisfiableError`, network errors, `CondaValueError`, and other failures intentionally emit nothing. No event in these cases is expected, not a bug.
 * Existing HTTP-header telemetry remains active alongside OTel telemetry in 0.4.0; don't mistake this legacy traffic for the new OTel events when inspecting network activity.
 * `install.channels` omits channels supplied only by an environment YAML file passed with `--file`; only channels configured through `.condarc` or the command line are captured. Tracked in [#237](https://github.com/anaconda/conda-anaconda-telemetry/issues/237).
+* `conda create --clone` and `conda create --file` with an `@EXPLICIT` package list bypass conda's solve step, so no `create.success` event is emitted even though the command completes successfully. This is expected, not a bug. Tracked in [#246](https://github.com/anaconda/conda-anaconda-telemetry/issues/246).
 
 ## 8. Additional Information
 
 ### Performance Considerations
 
-Telemetry only adds delay on commands that emit an event (success or PNFE). When the collector is reachable, expect an extra few hundred milliseconds. When it's unreachable, conda should still finish within a few seconds, not hang. Report anything that feels like a hang.
+Telemetry only adds delay on commands that emit an event (success or PNFE); expect an extra few hundred milliseconds. Telemetry must never cause conda to hang. Report anything that feels like a hang.
 
 ### Security Considerations
 
 No channel URL, private-channel host, token, file path, environment name, or username may appear in any payload. Channels are allow-listed and other names become `other`; an invalid package name suppresses the event. Inspect every captured payload for these values.
 
-Repeat the S2 test, but first set a special variable named `OTEL_RESOURCE_ATTRIBUTES` to the value `foo.bar=leak`. Confirm that `foo.bar` does NOT show up in the report (i.e., the plugin ignores this attempt to inject extra data), and that the variable's value is unchanged afterward. Then repeat once more setting `CI=true`, and confirm the report's `conda.ci_detected` field shows `true`.
+Repeat the S2 test, but first set a special variable named `OTEL_RESOURCE_ATTRIBUTES` to the value `foo.bar=leak`. Confirm that `foo.bar` does NOT show up in the report (i.e., the plugin ignores this attempt to inject extra data). Then repeat once more setting `CI=true`, and confirm the report's `conda.ci_detected` field shows `true`.
 
-Production sends events to `https://public.telemetry.anaconda.com/v1/logs`. Keep Mode A or Mode B configured throughout QA to prevent test data from reaching production.
+Each conda command runs in its own process, so a shell check of `OTEL_RESOURCE_ATTRIBUTES` before and after a CLI command cannot prove that the plugin restored the variable inside the process - the shell's copy was never changed to begin with. `tests/test_otlp_integration.py` already verifies this restoration in-process. Command state (the requested/resolved packages captured for a report) is also process-local; `tests/test_plugin.py` verifies it is cleared after both successful and failed commands.
+
+Production sends events to `https://public.telemetry.anaconda.com/v1/logs`. Keep the local collector endpoint configured throughout QA to prevent test data from reaching production.
 
 ## 9. References & Resources
 
@@ -539,10 +528,6 @@ Production sends events to `https://public.telemetry.anaconda.com/v1/logs`. Keep
 * Telemetry SDK and payload schema: https://github.com/anaconda/anaconda-otel-python (`docs/source/getting_started.md` and `docs/source/schema-versions.md`)
 * OpenTelemetry collector image: https://hub.docker.com/r/otel/opentelemetry-collector
 
-### Related Tickets/Issues
-
-* [Suppress hostname and session ID #236](https://github.com/anaconda/conda-anaconda-telemetry/issues/236)
-
 ### Demo/Prototype
 
 * `tests/test_otlp_integration.py` is an integration test with the exact signal verification; using a local HTTP server.
@@ -551,7 +536,6 @@ Production sends events to `https://public.telemetry.anaconda.com/v1/logs`. Keep
 
 Run these additional checks:
 
-* Run two conda commands consecutively and verify distinct `session.id` values and no state leakage, such as a failed install followed by a successful create.
 * Interrupt an install with Ctrl+C and verify no event or traceback.
 
 ## 10. Timeline
@@ -564,19 +548,25 @@ Run these additional checks:
 
 ## Notes for Testing Team
 
-Install the plugin in base. Use Mode A for payload checks and Mode B only for S15; use `127.0.0.1` in Mode B because `localhost` selects the console exporter. Attach raw JSON or collector output for each scenario.
+Install the plugin in base. Keep the collector terminal and conda terminal open throughout testing. Attach raw JSON or collector output for each scenario.
 
 ### Final Cleanup
 
-Once all scenarios are complete, uninstall the QA installation using the Miniconda uninstaller, which removes every environment created during testing along with the installation itself:
+Once all scenarios are complete, stop the collector and remove the QA-only telemetry variables, then uninstall the QA installation using the Miniconda uninstaller, which removes every environment created during testing along with the installation itself:
 
 ```shell
-# Linux and macOS
+# Collector terminal: stop the collector with Ctrl+C.
+```
+
+```shell
+# Conda terminal (Linux and macOS)
+unset ATEL_DEFAULT_ENDPOINT ATEL_ENVIRONMENT
 conda deactivate
 ~/conda-qa/uninstall.sh
 ```
 
 ```powershell
-# Windows PowerShell
+# Conda terminal (Windows PowerShell)
+Remove-Item Env:ATEL_DEFAULT_ENDPOINT, Env:ATEL_ENVIRONMENT
 Start-Process -FilePath "$env:USERPROFILE\conda-qa\Uninstall-Miniconda3.exe" -ArgumentList "/S" -Wait
 ```
