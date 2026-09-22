@@ -438,7 +438,19 @@ Verify `remove`, `update`, `search`, and `list` emit no OTel event. With `conda 
 
 #### S12 - Collector unreachable or offline
 
-This is covered by existing automated tests and is not manually exercised in this QA pass: `tests/test_plugin.py` (for example `test_report_error_send_event_failure_is_consumed` and `test_report_success_send_event_failure_is_consumed`) verifies that a failure to send a signal is consumed rather than raised, so it cannot affect conda's normal behavior.
+```shell
+# Linux and macOS
+ATEL_DEFAULT_ENDPOINT=http://127.0.0.1:4999 conda create -n qa-s12 --dry-run -c defaults definitely-not-a-real-package-xyz
+```
+
+```powershell
+# Windows PowerShell
+$env:ATEL_DEFAULT_ENDPOINT = "http://127.0.0.1:4999"
+conda create -n qa-s12 --dry-run -c defaults definitely-not-a-real-package-xyz
+$env:ATEL_ENVIRONMENT = "test"
+```
+
+With nothing listening on port 4999, verify normal PNFE output and exit code, no traceback, and that the command finishes within a few seconds rather than hanging (see Performance Considerations).
 
 #### S13 - Invalid telemetry configuration
 
