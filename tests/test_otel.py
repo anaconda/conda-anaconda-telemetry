@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import os
 import platform
+import threading
+import time
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -14,6 +16,7 @@ from conda import __version__ as conda_version
 from conda.exceptions import PackagesNotFoundError
 
 from conda_anaconda_telemetry.otel import (
+    _SHUTDOWN_TIMEOUT_SECONDS,
     LIST_BYTE_LIMIT,
     LIST_ITEM_LIMIT,
     OTHER_CHANNEL_LABEL,
@@ -617,3 +620,28 @@ def test_proxy_url_comes_from_conda_not_atel_proxy_url(
     config = AnacondaTelemetry()._make_config()
 
     assert config._get_proxy_url() == expected_proxy_url
+
+
+def test_shutdown_before_time_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """shutdown() must return within the time limit."""
+    monkeypatch.setenv("ATEL_DEFAULT_ENDPOINT", DUMMY_ENDPOINT)
+    monkeypatch.setattr(sig, "flush_telemetry", lambda: threading.Event().wait())
+
+    telemetry = AnacondaTelemetry()
+    done = threading.Event()
+
+    def call_shutdown() -> None:
+        telemetry.shutdown()
+        done.set()
+
+    start = time.monotonic()
+    # we use threading to ensure that a stalled test also fails
+    watcher = threading.Thread(target=call_shutdown, daemon=True)
+    watcher.start()
+    watcher.join(timeout=_SHUTDOWN_TIMEOUT_SECONDS + 1.0)
+    elapsed = time.monotonic() - start
+
+    assert done.is_set(), "shutdown() did not return in time"
+    assert elapsed < _SHUTDOWN_TIMEOUT_SECONDS + 1.0
