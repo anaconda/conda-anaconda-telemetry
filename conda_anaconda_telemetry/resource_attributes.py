@@ -1,4 +1,4 @@
-# Copyright (C) 2024-2026 Anaconda, Inc
+# Copyright (C) 2024 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
 """Gather installer and conda resource attributes for telemetry."""
 
