@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
@@ -51,6 +52,11 @@ LIST_BYTE_LIMIT = 500
 #: reach the payload.
 KNOWN_INSTALL_CHANNELS = frozenset({"defaults", "main", "main-x", "conda-forge"})
 OTHER_CHANNEL_LABEL = "other"
+
+# From running scripts/benchmark_timing.sh the slowest observed
+# flush (~2.3-2.9s outlier) is covered by the 3.0s timeout
+# without excessive stalling
+_SHUTDOWN_TIMEOUT_SECONDS = 3.0
 
 
 @contextmanager
@@ -122,9 +128,15 @@ class AnacondaTelemetry:
         config.set_proxy_url(
             requests.utils.select_proxy(self.default_endpoint, context.proxy_servers)
         )
+        # Never probe connectivity before sending an event: skip this for every
+        # endpoint, not just localhost, so a slow/unreachable network can't add
+        # latency to a conda command that's just trying to report an error.
+        config.set_skip_internet_check(True)
+        # Manage shutdown ourselves (see shutdown() below) with a fixed timeout,
+        # instead of letting the SDK register its own unbounded atexit handler.
+        config.set_shutdown_on_exit(False)
         if urlparse(self.default_endpoint).hostname in ("localhost", "127.0.0.1"):
-            # Local collectors do not need an internet connectivity check.
-            config.set_skip_internet_check(True)
+            # Local collectors still export over real OTLP, not the console.
             config.set_console_exporter(False)
         return config
 
@@ -159,24 +171,49 @@ class AnacondaTelemetry:
     def send_event(
         self, event_name: str, body: str, attributes: dict[str, Any] | None = None
     ) -> None:
-        """Send a telemetry event."""
+        """Send a telemetry event and flush it within a fixed time budget.
+
+        This only queues the event; it is not actually sent until shutdown()
+        flushes it. Since _make_config() turns off the SDK's automatic
+        shutdown, that flush is called here so callers can't forget it.
+        """
         if attributes is None:
             attributes = {}
 
         logger.info("Sending a signal with event log data to the telemetry collector.")
 
-        # OTel reads attribute limits again when constructing each log record.
-        with _ignore_otel_environment():
-            result = sig.send_event(
-                event_name=event_name,
-                body=body,
-                attributes=attributes,
-            )
+        try:
+            # OTel reads attribute limits again when constructing each log record.
+            with _ignore_otel_environment():
+                result = sig.send_event(
+                    event_name=event_name,
+                    body=body,
+                    attributes=attributes,
+                )
 
-        if result is True:
-            logger.info("Event log sent successfully!")
-        else:
-            logger.debug("Event log failed to send.")
+            if result is True:
+                logger.info("Event log queued.")
+            else:
+                logger.debug("Event log failed to send.")
+        finally:
+            self.shutdown()
+
+    def shutdown(self) -> None:
+        """Flush pending telemetry within a fixed time budget.
+
+        Uses flush_telemetry() instead of shutdown_telemetry(), which only
+        flushes once per process and does nothing on later calls. We bound
+        it ourselves with a thread/timeout since local testing showed the
+        SDK's own force_flush(timeout_millis=...) seems to ignore its
+        timeout argument.
+        """
+        # flush_telemetry() flushes everything in the process, not just ours.
+        # Fine today since we only use logging.
+        # TODO: Should we also invoke
+        # opentelemetry._logs.get_logger_provider().force_flush() here?
+        flush_thread = threading.Thread(target=sig.flush_telemetry, daemon=True)
+        flush_thread.start()
+        flush_thread.join(timeout=_SHUTDOWN_TIMEOUT_SECONDS)
 
 
 def package_names(specs: list[Any]) -> list[str] | None:
