@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 class TelemetryCommand(str, Enum):
     """Supported commands for telemetry tracking."""
 
-    BUILD = "build"
     CREATE = "create"
     INFO = "info"
     INSTALL = "install"
@@ -41,7 +40,7 @@ class TelemetryCommand(str, Enum):
     REMOVE = "remove"
     SEARCH = "search"
     UPDATE = "update"
-    
+
 
 @dataclass
 class CommandRequest:
