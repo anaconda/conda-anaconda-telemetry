@@ -59,3 +59,18 @@ def get_conda_attributes() -> dict[str, str]:
         "conda.version": conda_version,
         "conda.ci_detected": json.dumps(boolify(os.environ.get("CI", ""))),
     }
+
+
+def get_conda_build_attributes() -> dict[str, str]:
+    """Gather all ``conda.build.*`` resource attributes.
+
+    These are only present in conda-build environments, and are not gathered
+    by default since they are not relevant to all users.
+    """
+    try:
+        from conda_build. import __version__ as conda_build_version
+    except ImportError:
+        return {}
+    return {
+        "conda.build.version": conda_build_version,
+        "conda.build.detected": json.dumps(boolify(os.environ.get("CONDA_BUILD", ""))),}
