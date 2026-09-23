@@ -1,6 +1,4 @@
-# Copyright (C) 2024-2026 Anaconda, Inc
-# SPDX-License-Identifier: BSD-3-Clause
-# Copyright (C) Anaconda, Inc
+# Copyright (C) 2024 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
 """Test the complete OTLP export path against a local HTTP server.
 

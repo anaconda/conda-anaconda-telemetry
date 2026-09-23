@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# Copyright (C) 2024 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 # Copyright (C) 2024-2026 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
 # scripts/_summarize_benchmarks.py
