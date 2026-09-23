@@ -25,6 +25,7 @@ from conda.models.match_spec import MatchSpec
 from conda_anaconda_telemetry import APP_NAME, APP_VERSION
 from conda_anaconda_telemetry.resource_attributes import (
     get_conda_attributes,
+    get_conda_build_attributes,
     get_installer_attributes,
 )
 
