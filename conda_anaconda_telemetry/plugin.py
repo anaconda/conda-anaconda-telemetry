@@ -34,9 +34,7 @@ class TelemetryCommand(str, Enum):
     """Supported commands for telemetry tracking."""
 
     CREATE = "create"
-    INFO = "info"
     INSTALL = "install"
-    LIST = "list"
     REMOVE = "remove"
     SEARCH = "search"
     UPDATE = "update"
