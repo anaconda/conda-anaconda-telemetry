@@ -82,28 +82,28 @@ def test_get_conda_attributes_no_ci(monkeypatch: MonkeyPatch) -> None:
     assert result["conda.ci_detected"] == "false"
 
 
-def test_get_conda_build_version(mocker: MockerFixture) -> None:
-    """conda.build.version is assembled with the expected value."""
-    mock_conda_build = mocker.MagicMock()
-    mock_conda_build.__version__ = "26.7.1"
-
-    mocker.patch.dict(
-        "sys.modules",
-        {"conda_build": mock_conda_build},
-    )
+@pytest.mark.parametrize(
+    "conda_build_version,expected_version",
+    [
+        ("26.7.1", "26.7.1"),
+        (None, "n/a"),
+    ],
+)
+def test_get_conda_build_version(mocker: MockerFixture, conda_build_version: str | None, expected_version: str) -> None:
+    """conda.build.version matches the expected value."""
+    if conda_build_version is None:
+        mocker.patch.dict(
+            "sys.modules",
+            {"conda_build": None},
+        )
+    else:
+        mock_conda_build = mocker.MagicMock()
+        mock_conda_build.__version__ = conda_build_version
+        mocker.patch.dict(
+            "sys.modules",
+            {"conda_build": mock_conda_build},
+        )
 
     assert get_conda_build_attributes() == {
-        "conda.build.version": "26.7.1",
-    }
-
-
-def test_get_conda_build_version_not_installed(mocker: MockerFixture) -> None:
-    """conda.build.version is 'n/a' when conda-build is not installed."""
-    mocker.patch.dict(
-        "sys.modules",
-        {"conda_build": None},
-    )
-
-    assert get_conda_build_attributes() == {
-        "conda.build.version": "n/a",
-    }
+            "conda.build.version": expected_version,
+        }
