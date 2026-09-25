@@ -29,6 +29,9 @@ conda remove --name base conda-anaconda-telemetry
 
 ## Contributing to this repository
 
+See the [maintainer information](docs/dev/index.md#maintainer-information)
+for versioning and vulnerability reporting.
+
 Contributions are very welcome 😄
 
 Feel free to:
