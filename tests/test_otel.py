@@ -495,3 +495,24 @@ def test_proxy_url_comes_from_conda_not_atel_proxy_url(
     config = AnacondaTelemetry()._make_config()
 
     assert config._get_proxy_url() == expected_proxy_url
+
+
+@pytest.mark.parametrize(
+    ("search_term", "found"),
+    [
+        ("numpy", True),
+        ("conda=26.9.0", False),
+        ("conda-forge::numpy", True),
+        ("python>=3.12", True),
+    ],
+)
+def test_get_search_attributes(search_term: str, found: bool) -> None:
+    """Search attributes preserve the user's match spec and result."""
+    assert get_search_attributes(
+        search_term=search_term,
+        found=found,
+    ) == {
+        "command": "search",
+        "search.term": search_term,
+        "search.found": found,
+    }
