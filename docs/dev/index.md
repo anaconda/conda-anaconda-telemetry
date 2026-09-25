@@ -1,7 +1,7 @@
 # Developer Guide
 
-This developer guide is split into two parts: setting up your development
-environment and a discussion on how the plugin itself functions.
+This guide covers development setup, the plugin's technical design, and
+maintainer information.
 
 ## Development environment
 
@@ -54,6 +54,17 @@ Below is a table showing the current headers, along with their size limits:
 | `anaconda-telemetry-search`           | 500             |
 | `anaconda-telemetry-install`          | 500             |
 | `anaconda-telemetry-sys-info`         | 500             |
+
+## Maintainer information
+
+Conda Anaconda Telemetry (`conda-anaconda-telemetry`) uses increasing
+`MAJOR.MINOR.PATCH` version numbers for final releases, such as `0.3.1`, following
+[PEP 440](https://packaging.python.org/en/latest/specifications/version-specifiers/#version-scheme).
+Release tags contain the version number without a `v` prefix. The package version
+is derived from Git tags by `hatch-vcs`, as configured in `pyproject.toml`.
+
+For vulnerability reporting and the coordinated disclosure policy, see
+[Anaconda's security.txt](https://www.anaconda.com/.well-known/security.txt).
 
 
 ```{toctree}
