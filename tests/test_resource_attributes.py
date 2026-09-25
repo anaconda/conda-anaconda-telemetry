@@ -9,6 +9,7 @@ import pytest
 
 from conda_anaconda_telemetry.resource_attributes import (
     get_conda_attributes,
+    get_conda_build_attributes,
     get_installer_attributes,
 )
 
@@ -79,3 +80,18 @@ def test_get_conda_attributes_no_ci(monkeypatch: MonkeyPatch) -> None:
 
     result = get_conda_attributes()
     assert result["conda.ci_detected"] == "false"
+
+
+def test_get_conda_build_version(monkeypatch: MonkeyPatch, mocker: MockerFixture) -> None:
+    """conda.build.version is assembled with the expected value."""
+    mock_conda_build = mocker.MagicMock()
+    mock_conda_build.__version__ = "26.7.1"
+
+    mocker.patch.dict(
+        "sys.modules",
+        {"conda_build": mock_conda_build},
+    )
+
+    assert get_conda_build_attributes() == {
+        "conda.build.version": "26.7.1",
+    }

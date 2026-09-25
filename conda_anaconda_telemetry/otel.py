@@ -144,6 +144,7 @@ class AnacondaTelemetry:
         for key, value in {
             **get_installer_attributes(),
             **get_conda_attributes(),
+            **get_conda_build_attributes(),
         }.items():
             setattr(attributes, key, value)
         return attributes
