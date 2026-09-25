@@ -68,9 +68,12 @@ def get_conda_build_attributes() -> dict[str, str]:
     by default since they are not relevant to all users.
     """
     try:
-        from conda_build. import __version__ as conda_build_version
+        from conda_build import __version__ as conda_build_version
     except ImportError:
         return {}
+
     return {
         "conda.build.version": conda_build_version,
-        "conda.build.detected": json.dumps(boolify(os.environ.get("CONDA_BUILD", ""))),}
+        # "conda.build.recipe_name": str(context.conda_build_recipe_name) if context.conda_build_recipe_name else None,
+        }
+
