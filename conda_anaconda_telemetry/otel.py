@@ -25,6 +25,7 @@ from conda.models.match_spec import MatchSpec
 from conda_anaconda_telemetry import APP_NAME, APP_VERSION
 from conda_anaconda_telemetry.resource_attributes import (
     get_conda_attributes,
+    get_conda_build_attributes,
     get_installer_attributes,
 )
 
@@ -143,6 +144,7 @@ class AnacondaTelemetry:
         for key, value in {
             **get_installer_attributes(),
             **get_conda_attributes(),
+            **get_conda_build_attributes(),
         }.items():
             setattr(attributes, key, value)
         return attributes
@@ -283,8 +285,17 @@ def get_success_attributes(
     )
     resolved, resolved_truncated = _truncate(resolved_packages)
 
+    if command in ("install", "create"):
+        # Only these commands have a resolved package list.
+        attributes["resolved.packages"] = resolved
+        attributes["truncated"] = truncated or resolved_truncated
+    
+    return attributes
+
+
+def get_search_attributes(search_term: str) -> dict[str, Any]:
+    """Build attributes for a search signal."""
     return {
-        **attributes,
-        "resolved.packages": resolved,
-        "truncated": truncated or resolved_truncated,
+        "command": "search",
+        "search.term": search_term,
     }

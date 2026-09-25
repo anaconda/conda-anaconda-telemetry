@@ -19,6 +19,7 @@ from conda_anaconda_telemetry.otel import (
     OTHER_CHANNEL_LABEL,
     AnacondaTelemetry,
     get_install_attributes,
+    get_search_attributes,
     get_success_attributes,
     package_names,
 )
@@ -495,3 +496,20 @@ def test_proxy_url_comes_from_conda_not_atel_proxy_url(
     config = AnacondaTelemetry()._make_config()
 
     assert config._get_proxy_url() == expected_proxy_url
+
+
+@pytest.mark.parametrize(
+    "search_term",
+    [
+        "numpy",
+        "conda=26.9.0",
+        "conda-forge::numpy",
+        "python>=3.12",
+    ],
+)
+def test_get_search_attributes(search_term: str) -> None:
+    """Search attributes preserve the user's match spec."""
+    assert get_search_attributes(search_term) == {
+        "command": "search",
+        "search.term": search_term,
+    }
