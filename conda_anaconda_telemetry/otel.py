@@ -289,12 +289,13 @@ def get_success_attributes(
         # Only these commands have a resolved package list.
         attributes["resolved.packages"] = resolved
         attributes["truncated"] = truncated or resolved_truncated
+    
+    return attributes
 
 
-def get_search_attributes(*, search_term: str, found: bool) -> dict[str, Any]:
+def get_search_attributes(search_term: str) -> dict[str, Any]:
     """Build attributes for a search signal."""
     return {
         "command": "search",
         "search.term": search_term,
-        "search.found": found,
     }
