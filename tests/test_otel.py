@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
+import io
 import logging
 import os
 import platform
@@ -11,9 +12,12 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import anaconda_opentelemetry.signals as sig
+import opentelemetry._logs._internal as logs_internal
 import pytest
+from anaconda_opentelemetry.logging import _AnacondaLogger
 from conda import __version__ as conda_version
 from conda.exceptions import PackagesNotFoundError
+from opentelemetry.sdk._logs import LoggerProvider
 
 from conda_anaconda_telemetry.otel import (
     _SHUTDOWN_TIMEOUT_SECONDS,
@@ -187,23 +191,13 @@ def test_send_event_twice_in_one_process_flushes_both(
     assert flush_calls == [True, True]
 
 
-def test_flush_telemetry_misses_events_when_another_provider_registered_first(
+def test_flush_telemetry_flushes_correctly(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """This test currently reproduces a bug:
-    if something else already filled OTel's shared
-    "current logger provider" slot first, flush_telemetry() flushes that
-    provider instead of ours, so our own queued events never get sent.
-
-    When fixed upstream, the first assert below will
-    fail, since our events would already be flushed by that point.
+    """Regression test: if something else already filled OTel's shared
+    "current logger provider" slot first, flush_telemetry() must still flush
+    our own queued events, not the foreign provider.
     """
-    import io
-
-    import opentelemetry._logs._internal as logs_internal
-    from anaconda_opentelemetry.logging import _AnacondaLogger
-    from opentelemetry.sdk._logs import LoggerProvider
-
     monkeypatch.setattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED", False)
     # Simulate the shared slot already being filled by something else, so our
     # own attempt to fill it later is a silent no-op, like it would be in
@@ -232,14 +226,10 @@ def test_flush_telemetry_misses_events_when_another_provider_registered_first(
     telemetry.send_event("install.error", "first")
     telemetry.send_event("install.error", "second")
 
-    # Bug: flush_telemetry() flushed the wrong provider, so nothing sent yet.
-    assert console_out.getvalue() == ""
-
-    # Our provider still has the events queued; flushing it directly (not via
-    # the shared slot) proves they were queued fine and only the flush step
-    # was wrong.
-    _AnacondaLogger._instance._provider.force_flush()
+    # flush_telemetry() now flushes the plugin's own provider, not
+    # whichever provider filled OTel's shared global slot first.
     assert "first" in console_out.getvalue()
+    assert "second" in console_out.getvalue()
 
 
 def test_make_attributes_system_info() -> None:
