@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
   "conda >=26.5",
-  "anaconda-opentelemetry >=1.2.4",  # require at least 1.2.4 to exclude hostname and disable session.id
+  "anaconda-opentelemetry >=1.2.5",  # 1.2.5 fixes flush_telemetry() flushing the wrong LoggerProvider
   "requests",
 ]
 description = "A conda plugin for Anaconda Telemetry"

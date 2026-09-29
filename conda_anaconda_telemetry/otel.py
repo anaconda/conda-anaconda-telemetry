@@ -207,10 +207,6 @@ class AnacondaTelemetry:
         SDK's own force_flush(timeout_millis=...) seems to ignore its
         timeout argument.
         """
-        # flush_telemetry() flushes everything in the process, not just ours.
-        # Fine today since we only use logging.
-        # TODO: Should we also invoke
-        # opentelemetry._logs.get_logger_provider().force_flush() here?
         flush_thread = threading.Thread(target=sig.flush_telemetry, daemon=True)
         flush_thread.start()
         flush_thread.join(timeout=_SHUTDOWN_TIMEOUT_SECONDS)
