@@ -277,18 +277,24 @@ def get_success_attributes(
     command: str,
     channels: list[str],
     requested_names: list[str],
-    resolved_packages: list[str],
+    resolved_packages: dict[str, list[str]],
 ) -> dict[str, Any]:
     """Build attributes for an install/create success signal."""
     attributes, truncated = _get_command_attributes(
         command=command, channels=channels, requested_names=requested_names
     )
-    resolved, resolved_truncated = _truncate(resolved_packages)
+    unlinked, unlinked_truncated = _truncate(resolved_packages["unlinked"])
+    linked, linked_truncated = _truncate(resolved_packages["linked"])
 
     if command in ("install", "create"):
         # Only these commands have a resolved package list.
-        attributes["resolved.packages"] = resolved
-        attributes["truncated"] = truncated or resolved_truncated
+        attributes["resolved.unlinked"] = unlinked
+        attributes["resolved.linked"] = linked
+        attributes["truncated"] = (
+            truncated
+            or unlinked_truncated
+            or linked_truncated
+        )
     
     return attributes
 

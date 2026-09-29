@@ -271,6 +271,7 @@ def test_get_install_attributes_truncation(
     assert attributes["requested.packages"] == expected_kept
     assert attributes["truncated"] == expected_truncated
 
+from pprint import pprint
 
 @pytest.mark.parametrize("command", ["install", "create"])
 def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
@@ -284,8 +285,13 @@ def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
         command=command,
         channels=["defaults", "main-x", "private-channel"],
         requested_names=["pkg_bar", "pkg_foo"],
-        resolved_packages=["pkg_foo=9.9.9=1"],
+        resolved_packages={
+            "unlinked": [],
+            "linked": ["pkg_foo=9.9.9=1"],
+        },
     )
+    
+    pprint(attributes)
 
     assert attributes == {
         "command": command,
@@ -293,7 +299,8 @@ def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
         "install.channels": ["defaults", "main-x", OTHER_CHANNEL_LABEL],
         "install.channel_priority": "strict",
         "requested.packages": ["pkg_bar", "pkg_foo"],
-        "resolved.packages": ["pkg_foo=9.9.9=1"],
+        "resolved.unlinked": [],
+        "resolved.linked": ["pkg_foo=9.9.9=1"],
         "truncated": False,
     }
 
