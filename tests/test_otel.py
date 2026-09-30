@@ -22,6 +22,7 @@ from conda_anaconda_telemetry.otel import (
     get_remove_attributes,
     get_search_attributes,
     get_success_attributes,
+    get_update_attributes,
     package_names,
 )
 
@@ -345,6 +346,28 @@ def test_get_success_attributes_truncated_resolved_packages(
     # version-qualified package strings - see LIST_BYTE_LIMIT.
     assert len(attributes["resolved.packages"]) < LIST_ITEM_LIMIT
     assert attributes["truncated"] is True
+
+
+@pytest.mark.parametrize(
+    ("requested_names", "update_all"),
+    [
+        (["pkg_bar"], False),
+        ([], True),
+    ],
+)
+def test_get_update_attributes(
+    requested_names: list[str],
+    update_all: bool,
+) -> None:
+    assert get_update_attributes(
+        requested_names=requested_names,
+        update_all=update_all,
+    ) == {
+        "command": "update",
+        "update.all": update_all,
+        "requested.packages": requested_names,
+        "truncated": False,
+    }
 
 
 def test_atel_default_endpoint_env_var_does_not_override_probe_target(

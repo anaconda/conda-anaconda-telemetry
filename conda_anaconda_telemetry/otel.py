@@ -308,3 +308,15 @@ def get_remove_attributes(requested_names: list[str]) -> dict[str, Any]:
         "requested.packages": requested,
         "truncated": truncated
     }
+
+
+def get_update_attributes(*, requested_names: list[str], update_all: bool) -> dict[str, Any]:
+    """Build attributes for an update signal."""
+    requested, truncated = _truncate(requested_names)
+    
+    return {
+        "command": "update",
+        "update.all": update_all,
+        "requested.packages": requested,
+        "truncated": truncated,
+    }

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from conda.base.constants import UpdateModifier
 from conda.base.context import context
 from conda.exceptions import PackagesNotFoundInChannelsError
 
@@ -18,6 +19,7 @@ from conda_anaconda_telemetry.otel import (
     get_remove_attributes,
     get_search_attributes,
     get_success_attributes,
+    get_update_attributes,
     package_names,
 )
 
@@ -55,6 +57,7 @@ class CommandRequest:
     channels: list[str] | None = None
     resolved_packages: list[str] | None = None
     search_term: str | None = None
+    update_all: bool = False
 
 
 command_request = CommandRequest()
@@ -66,7 +69,7 @@ def capture_command(command: str) -> None:
     command_request.channels = None
     command_request.resolved_packages = None
     command_request.search_term = None
-
+    command_request.update_all = False
     if not context.plugins.anaconda_telemetry:
         command_request.command = None
         return
@@ -76,6 +79,10 @@ def capture_command(command: str) -> None:
         command_request.channels = list(context.channels)
         if command_request.command == TelemetryCommand.SEARCH:
             command_request.search_term = context._argparse_args.match_spec
+        elif command_request.command == TelemetryCommand.UPDATE:
+            command_request.update_all = bool(
+                context.update_modifier == UpdateModifier.UPDATE_ALL
+            )
     except ValueError:
         command_request.command = None
 
@@ -85,6 +92,10 @@ def capture_requested_packages(
 ) -> None:
     """Pre-solve hook to extract and save requested package names from specs."""
     if context.plugins.anaconda_telemetry and command_request.command is not None:
+        if (command_request.command == TelemetryCommand.UPDATE and command_request.update_all):
+            command_request.requested_names = []
+            return
+
         specs = (
             specs_to_remove
             if command_request.command == TelemetryCommand.REMOVE
@@ -116,6 +127,7 @@ def clear_command(_command_name: str | None = None) -> None:
     command_request.channels = None
     command_request.resolved_packages = None
     command_request.search_term = None
+    command_request.update_all = False
 
 
 # Generic error reporting function which can be expanded to track any error, as needed.
@@ -196,7 +208,16 @@ def report_success(command: str) -> None:
                 return
 
             attributes = get_remove_attributes(request.requested_names)
-            
+
+        elif request.command is TelemetryCommand.UPDATE:
+            if request.requested_names is None:
+                return
+
+            attributes = get_update_attributes(
+                requested_names=request.requested_names,
+                update_all=request.update_all
+            )
+
         elif request.command in {
             TelemetryCommand.CREATE,
             TelemetryCommand.INSTALL,

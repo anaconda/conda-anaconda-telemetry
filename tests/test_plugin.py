@@ -229,6 +229,7 @@ def test_capture_command_disabled_plugin(mocker: MockerFixture) -> None:
         (True, plugin_module.TelemetryCommand.INSTALL, ["numpy", "python"]),
         (True, plugin_module.TelemetryCommand.CREATE, ["numpy", "python"]),
         (True, plugin_module.TelemetryCommand.REMOVE, ["numpy", "python"]),
+        (True, plugin_module.TelemetryCommand.UPDATE, ["numpy", "python"]),
         # Not captured as supported (e.g. a solve triggered by another command,
         # since conda calls this hook unconditionally).
         (True, None, None),
@@ -260,6 +261,18 @@ def test_capture_requested_packages(
     )
 
     assert plugin_module.command_request.requested_names == expected_names
+
+
+def test_capture_requested_packages_update_all(mocker: MockerFixture) -> None:
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    plugin_module.command_request.command = plugin_module.TelemetryCommand.UPDATE
+    plugin_module.command_request.update_all = True
+
+    capture_requested_packages(frozenset(), frozenset())
+
+    assert plugin_module.command_request.requested_names == []
 
 
 def test_capture_resolved_packages(mocker: MockerFixture) -> None:
