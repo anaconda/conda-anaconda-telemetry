@@ -181,7 +181,7 @@ def test_get_install_attributes(mocker: MockerFixture, command: str) -> None:
 
     assert attributes == {
         "command": command,
-        "event.schema_version": "1",
+        "event.schema_version": "2",
         "install.channels": [
             "defaults",
             "main",
@@ -285,22 +285,18 @@ def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
         command=command,
         channels=["defaults", "main-x", "private-channel"],
         requested_names=["pkg_bar", "pkg_foo"],
-        resolved_packages={
-            "unlinked": [],
-            "linked": ["pkg_foo=9.9.9=1"],
-        },
+        resolved_packages=["pkg_foo=9.9.9=1"],
     )
     
     pprint(attributes)
 
     assert attributes == {
         "command": command,
-        "event.schema_version": "1",
+        "event.schema_version": "2",
         "install.channels": ["defaults", "main-x", OTHER_CHANNEL_LABEL],
         "install.channel_priority": "strict",
         "requested.packages": ["pkg_bar", "pkg_foo"],
-        "resolved.unlinked": [],
-        "resolved.linked": ["pkg_foo=9.9.9=1"],
+        "resolved.packages": ["pkg_foo=9.9.9=1"],
         "truncated": False,
     }
 

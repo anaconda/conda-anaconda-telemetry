@@ -52,7 +52,7 @@ class CommandRequest:
     command: TelemetryCommand | None = None
     requested_names: list[str] | None = None
     channels: list[str] | None = None
-    resolved_packages: dict[str, list[str]] | None = None
+    resolved_packages: list[str] | None = None
     search_term: str | None = None
 
 
@@ -94,16 +94,10 @@ def capture_resolved_packages(
 ) -> None:
     """Save the most recent solve's linked packages for success telemetry."""
     if context.plugins.anaconda_telemetry and command_request.command is not None:
-        command_request.resolved_packages = {
-            "unlinked": [
-                f"{record.name}={record.version}={record.build}" 
-                for record in _unlink_precs
-            ],
-            "linked": [
-                f"{record.name}={record.version}={record.build}"
-                for record in link_precs
-            ],
-        }
+        command_request.resolved_packages = [
+            f"{record.name}={record.version}={record.build}" 
+            for record in link_precs
+        ]
 
 
 def clear_command(_command_name: str | None = None) -> None:

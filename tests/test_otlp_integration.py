@@ -216,7 +216,7 @@ def test_real_otlp_payload_received_by_local_collector(
     log_attrs = {kv.key: otlp_value(kv.value) for kv in log_record.attributes}
     assert log_attrs == {
         "command": "install",
-        "event.schema_version": "1",
+        "event.schema_version": "2",
         "exception.missing_specs": ["numpy"],
         "exception.name": "PackagesNotFoundInChannelsError",
         "install.channel_priority": "strict",

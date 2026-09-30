@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 #: Schema version for the created signal,
 #: bump manually whenever this contents/shape change.
-SIGNAL_VERSION = "1"
+SIGNAL_VERSION = "2"
 
 #: Placeholder item limit for list-valued event attributes.
 LIST_ITEM_LIMIT = 50
@@ -277,24 +277,17 @@ def get_success_attributes(
     command: str,
     channels: list[str],
     requested_names: list[str],
-    resolved_packages: dict[str, list[str]],
+    resolved_packages: list[str],
 ) -> dict[str, Any]:
     """Build attributes for an install/create success signal."""
     attributes, truncated = _get_command_attributes(
         command=command, channels=channels, requested_names=requested_names
     )
-    unlinked, unlinked_truncated = _truncate(resolved_packages["unlinked"])
-    linked, linked_truncated = _truncate(resolved_packages["linked"])
+    resolved, resolved_truncated = _truncate(resolved_packages)
 
     if command in ("install", "create"):
-        # Only these commands have a resolved package list.
-        attributes["resolved.unlinked"] = unlinked
-        attributes["resolved.linked"] = linked
-        attributes["truncated"] = (
-            truncated
-            or unlinked_truncated
-            or linked_truncated
-        )
+        attributes["resolved.packages"] = resolved
+        attributes["truncated"] = truncated or resolved_truncated
     
     return attributes
 
