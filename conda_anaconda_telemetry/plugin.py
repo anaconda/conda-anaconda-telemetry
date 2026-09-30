@@ -15,6 +15,7 @@ from conda.exceptions import PackagesNotFoundInChannelsError
 from conda_anaconda_telemetry.otel import (
     AnacondaTelemetry,
     get_install_attributes,
+    get_remove_attributes,
     get_search_attributes,
     get_success_attributes,
     package_names,
@@ -80,11 +81,16 @@ def capture_command(command: str) -> None:
 
 
 def capture_requested_packages(
-    specs_to_add: frozenset[MatchSpec], _specs_to_remove: frozenset[MatchSpec]
+    specs_to_add: frozenset[MatchSpec], specs_to_remove: frozenset[MatchSpec]
 ) -> None:
     """Pre-solve hook to extract and save requested package names from specs."""
     if context.plugins.anaconda_telemetry and command_request.command is not None:
-        command_request.requested_names = package_names(list(specs_to_add))
+        specs = (
+            specs_to_remove
+            if command_request.command == TelemetryCommand.REMOVE
+            else specs_to_add
+        )
+        command_request.requested_names = package_names(list(specs))
 
 
 def capture_resolved_packages(
@@ -146,7 +152,7 @@ def report_error(event: CondaExceptionEvent) -> None:
             )
         else:
             return
-            
+
         if attributes is None:
             return
 
@@ -184,6 +190,13 @@ def report_success(command: str) -> None:
                 return
 
             attributes = get_search_attributes(request.search_term)
+
+        elif request.command is TelemetryCommand.REMOVE:
+            if request.requested_names is None:
+                return
+
+            attributes = get_remove_attributes(request.requested_names)
+            
         elif request.command in {
             TelemetryCommand.CREATE,
             TelemetryCommand.INSTALL,

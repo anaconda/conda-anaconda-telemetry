@@ -298,3 +298,13 @@ def get_search_attributes(search_term: str) -> dict[str, Any]:
         "command": "search",
         "search.term": search_term,
     }
+
+
+def get_remove_attributes(requested_names: list[str]) -> dict[str, Any]:
+    """Build attributes for a remove signal."""
+    requested, truncated = _truncate(requested_names)
+    return {
+        "command": "remove",
+        "requested.packages": requested,
+        "truncated": truncated
+    }
