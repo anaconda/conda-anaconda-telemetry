@@ -28,6 +28,7 @@ from conda_anaconda_telemetry.otel import (
     AnacondaTelemetry,
     _service_version,
     get_install_attributes,
+    get_remove_attributes,
     get_success_attributes,
     package_names,
 )
@@ -403,6 +404,15 @@ def test_get_install_attributes_truncation(
     assert attributes["truncated"] == expected_truncated
 
 
+def test_get_remove_attributes(mocker: MockerFixture) -> None:
+    """Remove attributes use the current schema plus requested packages."""
+    assert get_remove_attributes(requested_names=["pkg_foo"]) == {
+        "command": "remove",
+        "requested.packages": ["pkg_foo"],
+        "truncated": False,
+    }
+
+
 @pytest.mark.parametrize("command", ["install", "create"])
 def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
     """Success attributes use the current schema plus resolved packages."""
@@ -417,7 +427,7 @@ def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
         requested_names=["pkg_bar", "pkg_foo"],
         resolved_packages=["pkg_foo=9.9.9=1"],
     )
-
+    
     assert attributes == {
         "command": command,
         "event.schema_version": "1",
