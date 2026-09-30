@@ -201,11 +201,12 @@ class AnacondaTelemetry:
     def shutdown(self) -> None:
         """Flush pending telemetry within a fixed time budget.
 
-        Uses flush_telemetry() instead of shutdown_telemetry(), which only
-        flushes once per process and does nothing on later calls. We bound
-        it ourselves with a thread/timeout since local testing showed the
-        SDK's own force_flush(timeout_millis=...) seems to ignore its
-        timeout argument.
+        sig.shutdown_telemetry() implements this same timeout pattern but is
+        one-shot per process and send_event() calls this after every
+        event. Use the repeatable sig.flush_telemetry() instead. Run it on a
+        daemon thread and bound the caller's wait with join() because the flush
+        itself could be unbounded since a flush that exceeds the timeout keeps
+        running in the background until process exit.
         """
         flush_thread = threading.Thread(target=sig.flush_telemetry, daemon=True)
         flush_thread.start()
