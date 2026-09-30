@@ -133,7 +133,10 @@ def report_error(event: CondaExceptionEvent) -> None:
                 return
 
             attributes = get_search_attributes(command_request.search_term)
-        else:
+        elif command in {
+            TelemetryCommand.CREATE,
+            TelemetryCommand.INSTALL,
+        }:
             requested_names = command_request.requested_names
             if requested_names is None:
                 return
@@ -141,6 +144,9 @@ def report_error(event: CondaExceptionEvent) -> None:
             attributes = get_install_attributes(
                 event, command=command.value, requested_names=requested_names
             )
+        else:
+            return
+            
         if attributes is None:
             return
 
@@ -169,10 +175,6 @@ def report_success(command: str) -> None:
         if not context.plugins.anaconda_telemetry:
             return
 
-        # These flags reach this hook when there is nothing left to install.
-        if context.dry_run or context.download_only:
-            return
-
         request = command_request
         if request.command is None:
             return
@@ -182,7 +184,14 @@ def report_success(command: str) -> None:
                 return
 
             attributes = get_search_attributes(request.search_term)
-        else:
+        elif request.command in {
+            TelemetryCommand.CREATE,
+            TelemetryCommand.INSTALL,
+        }:
+            # These flags reach this hook when there is nothing left to install.
+            if context.dry_run or context.download_only:
+                return
+
             if (
                 request.requested_names is None
                 or request.resolved_packages is None
@@ -202,6 +211,9 @@ def report_success(command: str) -> None:
                     "Failed to gather telemetry attributes for %s", command, exc_info=e
                 )
                 return
+            
+        else:
+            return
 
         try:
             telemetry = AnacondaTelemetry()
