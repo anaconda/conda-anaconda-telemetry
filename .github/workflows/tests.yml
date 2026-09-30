@@ -170,6 +170,10 @@ jobs:
           architecture: ${{ runner.arch }}
           channels: defaults
 
+      - name: Refresh Conda Index Cache
+        # This helps resolve CI errors due to a stale index cache
+        run: conda clean --index-cache --yes
+
       - name: Conda Install
         run: >
           conda install
