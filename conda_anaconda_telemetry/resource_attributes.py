@@ -18,18 +18,27 @@ INSTALLER_INFO_FIELDS = ("name", "version", "platform", "type")
 #: Subset of ``INSTALLER_INFO_FIELDS`` on the approved schema as attributes
 INSTALLER_ATTRIBUTE_FIELDS = ("name", "version", "platform")
 
+#: Maximum size of .installer.info that we parse.
+#:  Note that as of today the file is usually 1-2KB.
+INSTALLER_INFO_FILE_SIZE_LIMIT = 100 * 1024  # 100 KiB
+
+#: Maximum length of each string field read from .installer.info.
+INSTALLER_INFO_FIELD_LENGTH_LIMIT = 256
+
 
 def get_installer_attributes() -> dict[str, str]:
     """Read constructor's installer metadata from the base prefix.
 
-    Returns an empty dict if ``.installer.info`` is missing or malformed,
-    rather than raising - telemetry init must not fail because of this file.
+    Returns an empty dict if ``.installer.info`` is missing, malformed, or
+    too large, rather than raising.
 
     TODO: this duplicates conda's own conda.cli.main_info.get_installer_info(),
     which isn't available in the minimum conda version we support yet
     """
     path = Path(context.root_prefix, ".installer.info")
     try:
+        if path.stat().st_size > INSTALLER_INFO_FILE_SIZE_LIMIT:
+            return {}
         with path.open() as fh:
             data = json.load(fh)
     except (OSError, ValueError):
@@ -41,7 +50,10 @@ def get_installer_attributes() -> dict[str, str]:
     ):
         return {}
 
-    return {f"installer.{field}": data[field] for field in INSTALLER_ATTRIBUTE_FIELDS}
+    return {
+        f"installer.{field}": data[field][:INSTALLER_INFO_FIELD_LENGTH_LIMIT]
+        for field in INSTALLER_ATTRIBUTE_FIELDS
+    }
 
 
 def get_conda_attributes() -> dict[str, str]:
