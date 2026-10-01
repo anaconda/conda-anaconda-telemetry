@@ -19,7 +19,10 @@ from conda_anaconda_telemetry.otel import (
     OTHER_CHANNEL_LABEL,
     AnacondaTelemetry,
     get_install_attributes,
+    get_remove_attributes,
+    get_search_attributes,
     get_success_attributes,
+    get_update_attributes,
     package_names,
 )
 
@@ -180,7 +183,7 @@ def test_get_install_attributes(mocker: MockerFixture, command: str) -> None:
 
     assert attributes == {
         "command": command,
-        "event.schema_version": "1",
+        "event.schema_version": "2",
         "install.channels": [
             "defaults",
             "main",
@@ -271,6 +274,32 @@ def test_get_install_attributes_truncation(
     assert attributes["truncated"] == expected_truncated
 
 
+def test_get_remove_attributes() -> None:
+    """Remove attributes use the current schema plus requested packages."""
+    assert get_remove_attributes(requested_names=["pkg_foo"]) == {
+        "command": "remove",
+        "requested.packages": ["pkg_foo"],
+        "truncated": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "search_term",
+    [
+        "numpy",
+        "conda=26.9.0",
+        "conda-forge::numpy",
+        "python>=3.12",
+    ],
+)
+def test_get_search_attributes(search_term: str) -> None:
+    """Search attributes preserve the user's match spec."""
+    assert get_search_attributes(search_term) == {
+        "command": "search",
+        "search.term": search_term,
+    }
+
+
 @pytest.mark.parametrize("command", ["install", "create"])
 def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
     """Success attributes use the current schema plus resolved packages."""
@@ -288,7 +317,7 @@ def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
 
     assert attributes == {
         "command": command,
-        "event.schema_version": "1",
+        "event.schema_version": "2",
         "install.channels": ["defaults", "main-x", OTHER_CHANNEL_LABEL],
         "install.channel_priority": "strict",
         "requested.packages": ["pkg_bar", "pkg_foo"],
@@ -317,6 +346,28 @@ def test_get_success_attributes_truncated_resolved_packages(
     # version-qualified package strings - see LIST_BYTE_LIMIT.
     assert len(attributes["resolved.packages"]) < LIST_ITEM_LIMIT
     assert attributes["truncated"] is True
+
+
+@pytest.mark.parametrize(
+    ("requested_names", "update_all"),
+    [
+        (["pkg_bar"], False),
+        ([], True),
+    ],
+)
+def test_get_update_attributes(
+    requested_names: list[str],
+    update_all: bool,
+) -> None:
+    assert get_update_attributes(
+        requested_names=requested_names,
+        update_all=update_all,
+    ) == {
+        "command": "update",
+        "update.all": update_all,
+        "requested.packages": requested_names,
+        "truncated": False,
+    }
 
 
 def test_atel_default_endpoint_env_var_does_not_override_probe_target(
