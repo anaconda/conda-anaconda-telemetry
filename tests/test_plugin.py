@@ -257,7 +257,9 @@ def test_capture_requested_packages(
         frozenset()
         if captured_command == plugin_module.TelemetryCommand.REMOVE
         else specs,
-        specs if captured_command == plugin_module.TelemetryCommand.REMOVE else frozenset(),
+        specs
+        if captured_command == plugin_module.TelemetryCommand.REMOVE
+        else frozenset(),
     )
 
     assert plugin_module.command_request.requested_names == expected_names
@@ -316,8 +318,11 @@ def test_capture_search_command(mocker: MockerFixture) -> None:
 
     capture_command("search")
 
-    assert plugin_module.command_request.command == plugin_module.TelemetryCommand.SEARCH
+    assert (
+        plugin_module.command_request.command == plugin_module.TelemetryCommand.SEARCH
+    )
     assert plugin_module.command_request.search_term == "conda-forge::numpy>=2"
+
 
 @pytest.mark.parametrize("command_name", ["install", None])
 def test_clear_command_resets_state(command_name: str | None) -> None:
@@ -622,13 +627,13 @@ def test_report_error_signal_payload_baseline(
         "client_sdk_version",
         "schema_version",
         "parameters",
-        # "aau.version",
-        # "aau.client.token",
-        # "aau.session.token",
-        # "aau.environment.token",
-        # "aau.organization.tokens",
-        # "aau.installer.tokens",
-        # "aau.machine.tokens",
+        "aau.version",
+        "aau.client.token",
+        "aau.session.token",
+        "aau.environment.token",
+        "aau.organization.tokens",
+        "aau.installer.tokens",
+        "aau.machine.tokens",
         "installer.name",
         "installer.version",
         "installer.platform",
@@ -852,6 +857,7 @@ def test_report_success_search_found(mocker: MockerFixture) -> None:
 
     assert plugin_module.command_request.command is None
     assert plugin_module.command_request.search_term is None
+
 
 def test_report_error_search_not_found(mocker: MockerFixture) -> None:
     """A failed search sends the captured search term."""

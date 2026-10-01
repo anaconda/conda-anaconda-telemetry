@@ -282,7 +282,7 @@ def test_get_remove_attributes(mocker: MockerFixture) -> None:
         "truncated": False,
     }
 
-    
+
 @pytest.mark.parametrize(
     "search_term",
     [
@@ -314,7 +314,7 @@ def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
         requested_names=["pkg_bar", "pkg_foo"],
         resolved_packages=["pkg_foo=9.9.9=1"],
     )
-    
+
     assert attributes == {
         "command": command,
         "event.schema_version": "2",

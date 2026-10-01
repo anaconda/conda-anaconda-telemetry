@@ -92,7 +92,10 @@ def capture_requested_packages(
 ) -> None:
     """Pre-solve hook to extract and save requested package names from specs."""
     if context.plugins.anaconda_telemetry and command_request.command is not None:
-        if (command_request.command == TelemetryCommand.UPDATE and command_request.update_all):
+        if (
+            command_request.command == TelemetryCommand.UPDATE
+            and command_request.update_all
+        ):
             command_request.requested_names = []
             return
 
@@ -112,8 +115,7 @@ def capture_resolved_packages(
     """Save the most recent solve's linked packages for success telemetry."""
     if context.plugins.anaconda_telemetry and command_request.command is not None:
         command_request.resolved_packages = [
-            f"{record.name}={record.version}={record.build}" 
-            for record in link_precs
+            f"{record.name}={record.version}={record.build}" for record in link_precs
         ]
 
 
@@ -214,8 +216,7 @@ def report_success(command: str) -> None:
                 return
 
             attributes = get_update_attributes(
-                requested_names=request.requested_names,
-                update_all=request.update_all
+                requested_names=request.requested_names, update_all=request.update_all
             )
 
         elif request.command in {
@@ -245,7 +246,7 @@ def report_success(command: str) -> None:
                     "Failed to gather telemetry attributes for %s", command, exc_info=e
                 )
                 return
-            
+
         else:
             return
 

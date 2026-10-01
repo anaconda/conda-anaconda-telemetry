@@ -89,7 +89,9 @@ def test_get_conda_attributes_no_ci(monkeypatch: MonkeyPatch) -> None:
         (None, "n/a"),
     ],
 )
-def test_get_conda_build_version(mocker: MockerFixture, conda_build_version: str | None, expected_version: str) -> None:
+def test_get_conda_build_version(
+    mocker: MockerFixture, conda_build_version: str | None, expected_version: str
+) -> None:
     """conda.build.version matches the expected value."""
     if conda_build_version is None:
         mocker.patch.dict(
@@ -105,5 +107,5 @@ def test_get_conda_build_version(mocker: MockerFixture, conda_build_version: str
         )
 
     assert get_conda_build_attributes() == {
-            "conda.build.version": expected_version,
-        }
+        "conda.build.version": expected_version,
+    }

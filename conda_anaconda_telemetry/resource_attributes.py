@@ -75,5 +75,4 @@ def get_conda_build_attributes() -> dict[str, str]:
     return {
         "conda.build.version": conda_build_version,
         # "conda.build.recipe_name": str(context.conda_build_recipe_name) if context.conda_build_recipe_name else None,
-        }
-
+    }
