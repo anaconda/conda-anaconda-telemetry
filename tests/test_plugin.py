@@ -639,7 +639,6 @@ def test_report_error_signal_payload_baseline(
         "installer.platform",
         "conda.version",
         "conda.ci_detected",
-        "conda.build.version",
     }
     assert attributes.keys() - {"aau.anaconda_auth.token"} == expected_keys
     # Only spot-checking two values here; the other attributes are already
