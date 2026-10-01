@@ -132,6 +132,78 @@ def clear_command(_command_name: str | None = None) -> None:
     command_request.update_all = False
 
 
+def _get_error_attributes(
+    event: CondaExceptionEvent,
+    command: TelemetryCommand,
+) -> dict[str, str] | None:
+    if command is TelemetryCommand.SEARCH:
+        if command_request.search_term is None:
+            return None
+
+        return get_search_attributes(command_request.search_term)
+
+    if command in {
+        TelemetryCommand.CREATE,
+        TelemetryCommand.INSTALL,
+    }:
+        if command_request.requested_names is None:
+            return None
+
+        return get_install_attributes(
+            event,
+            command=command.value,
+            requested_names=command_request.requested_names,
+        )
+
+    return None
+
+
+def _get_success_attributes(
+    request: CommandRequest,
+) -> dict[str, str] | None:
+    if request.command is TelemetryCommand.SEARCH:
+        if request.search_term is None:
+            return None
+        return get_search_attributes(request.search_term)
+
+    if request.command is TelemetryCommand.REMOVE:
+        if request.requested_names is None:
+            return None
+        return get_remove_attributes(request.requested_names)
+
+    if request.command is TelemetryCommand.UPDATE:
+        if request.requested_names is None:
+            return None
+        return get_update_attributes(
+            requested_names=request.requested_names,
+            update_all=request.update_all,
+        )
+
+    if request.command in {
+        TelemetryCommand.CREATE,
+        TelemetryCommand.INSTALL,
+    }:
+        # These flags reach this hook when there is nothing left to install.
+        if context.dry_run or context.download_only:
+            return None
+
+        if (
+            request.requested_names is None
+            or request.resolved_packages is None
+            or request.channels is None
+        ):
+            return None
+
+        return get_success_attributes(
+            command=request.command.value,
+            channels=request.channels,
+            requested_names=request.requested_names,
+            resolved_packages=request.resolved_packages,
+        )
+
+    return None
+
+
 # Generic error reporting function which can be expanded to track any error, as needed.
 def report_error(event: CondaExceptionEvent) -> None:
     """Report an error to telemetry."""
@@ -148,25 +220,7 @@ def report_error(event: CondaExceptionEvent) -> None:
         if not isinstance(event.exc_value, PackagesNotFoundInChannelsError):
             return
 
-        if command is TelemetryCommand.SEARCH:
-            if command_request.search_term is None:
-                return
-
-            attributes = get_search_attributes(command_request.search_term)
-        elif command in {
-            TelemetryCommand.CREATE,
-            TelemetryCommand.INSTALL,
-        }:
-            requested_names = command_request.requested_names
-            if requested_names is None:
-                return
-
-            attributes = get_install_attributes(
-                event, command=command.value, requested_names=requested_names
-            )
-        else:
-            return
-
+        attributes = _get_error_attributes(event, command)
         if attributes is None:
             return
 
@@ -178,6 +232,7 @@ def report_error(event: CondaExceptionEvent) -> None:
                 "Failed to initialize telemetry for %s", event.exc_type, exc_info=e
             )
             return
+
         try:
             # anaconda-client's telemetry event naming convention
             event_name = f"{command.value}.pnfe"
@@ -190,7 +245,7 @@ def report_error(event: CondaExceptionEvent) -> None:
 
 
 def report_success(command: str) -> None:
-    """Report a successful install/create completion to telemetry."""
+    """Report a successful command completion to telemetry."""
     try:
         if not context.plugins.anaconda_telemetry:
             return
@@ -199,55 +254,15 @@ def report_success(command: str) -> None:
         if request.command is None:
             return
 
-        if request.command is TelemetryCommand.SEARCH:
-            if request.search_term is None:
-                return
-
-            attributes = get_search_attributes(request.search_term)
-
-        elif request.command is TelemetryCommand.REMOVE:
-            if request.requested_names is None:
-                return
-
-            attributes = get_remove_attributes(request.requested_names)
-
-        elif request.command is TelemetryCommand.UPDATE:
-            if request.requested_names is None:
-                return
-
-            attributes = get_update_attributes(
-                requested_names=request.requested_names, update_all=request.update_all
+        try:
+            attributes = _get_success_attributes(request)
+        except Exception as e:
+            logger.debug(
+                "Failed to gather telemetry attributes for %s", command, exc_info=e
             )
+            return
 
-        elif request.command in {
-            TelemetryCommand.CREATE,
-            TelemetryCommand.INSTALL,
-        }:
-            # These flags reach this hook when there is nothing left to install.
-            if context.dry_run or context.download_only:
-                return
-
-            if (
-                request.requested_names is None
-                or request.resolved_packages is None
-                or request.channels is None
-            ):
-                return
-
-            try:
-                attributes = get_success_attributes(
-                    command=request.command.value,
-                    channels=request.channels,
-                    requested_names=request.requested_names,
-                    resolved_packages=request.resolved_packages,
-                )
-            except Exception as e:
-                logger.debug(
-                    "Failed to gather telemetry attributes for %s", command, exc_info=e
-                )
-                return
-
-        else:
+        if attributes is None:
             return
 
         try:

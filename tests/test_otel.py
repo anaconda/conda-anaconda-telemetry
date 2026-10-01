@@ -274,7 +274,7 @@ def test_get_install_attributes_truncation(
     assert attributes["truncated"] == expected_truncated
 
 
-def test_get_remove_attributes(mocker: MockerFixture) -> None:
+def test_get_remove_attributes() -> None:
     """Remove attributes use the current schema plus requested packages."""
     assert get_remove_attributes(requested_names=["pkg_foo"]) == {
         "command": "remove",
