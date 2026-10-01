@@ -591,6 +591,7 @@ def test_report_error_signal_payload_baseline(
             plugins=SimpleNamespace(anaconda_telemetry=True),
         ),
     )
+    mocker.patch.dict("sys.modules", {"conda_build": None})
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
