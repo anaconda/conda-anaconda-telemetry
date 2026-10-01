@@ -176,6 +176,7 @@ def test_real_otlp_payload_received_by_local_collector(
         "aau.session.token",
         "aau.version",
         "client.sdk.version",
+        "conda.build.version",
         "conda.ci_detected",
         "conda.version",
         "environment",
