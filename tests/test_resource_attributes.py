@@ -83,16 +83,18 @@ def test_get_conda_attributes_no_ci(monkeypatch: MonkeyPatch) -> None:
 
 
 @pytest.mark.parametrize(
-    "conda_build_version,expected_version",
+    "conda_build_version,expected",
     [
-        ("26.7.1", "26.7.1"),
-        (None, "n/a"),
+        ("26.7.1", {"conda.build.version": "26.7.1"}),
+        (None, {}),  # conda-build not installed
     ],
 )
 def test_get_conda_build_version(
-    mocker: MockerFixture, conda_build_version: str | None, expected_version: str
+    mocker: MockerFixture,
+    conda_build_version: str | None,
+    expected: dict[str, str],
 ) -> None:
-    """conda.build.version matches the expected value."""
+    """conda.build.version is only included when conda-build is installed."""
     if conda_build_version is None:
         mocker.patch.dict(
             "sys.modules",
@@ -106,6 +108,4 @@ def test_get_conda_build_version(
             {"conda_build": mock_conda_build},
         )
 
-    assert get_conda_build_attributes() == {
-        "conda.build.version": expected_version,
-    }
+    assert get_conda_build_attributes() == expected

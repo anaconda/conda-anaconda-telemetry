@@ -70,7 +70,7 @@ def get_conda_build_attributes() -> dict[str, str]:
     try:
         from conda_build import __version__ as conda_build_version
     except ImportError:
-        conda_build_version = "n/a"
+        return {}
 
     return {
         "conda.build.version": conda_build_version,
