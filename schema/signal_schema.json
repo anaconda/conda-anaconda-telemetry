@@ -1,0 +1,98 @@
+{
+  "resource": {
+    "aau.anaconda_auth.token": "<string>",
+    "aau.client.token": "<string>",
+    "aau.environment.token": "<string>",
+    "aau.installer.tokens": "<string>",
+    "aau.machine.tokens": "<string>",
+    "aau.organization.tokens": "<string>",
+    "aau.session.token": "<string>",
+    "aau.version": "<string>",
+    "client.sdk.version": "<string>",
+    "conda.ci_detected": "<string>",
+    "conda.version": "<string>",
+    "environment": "test",
+    "installer.name": "<string>",
+    "installer.platform": "<string>",
+    "installer.version": "<string>",
+    "os.type": "<string>",
+    "os.version": "<string>",
+    "parameters": "<string>",
+    "platform": "<string>",
+    "python.version": "<string>",
+    "schema.version": "<string>",
+    "service.name": "conda-anaconda-telemetry",
+    "service.version": "<string>",
+    "telemetry.sdk.language": "<string>",
+    "telemetry.sdk.name": "<string>",
+    "telemetry.sdk.version": "<string>"
+  },
+  "events": {
+    "install.pnfe": {
+      "command": "install",
+      "event.schema_version": "1",
+      "exception.missing_specs": [
+        "<string>"
+      ],
+      "exception.name": "<string>",
+      "install.channel_priority": "<string>",
+      "install.channels": [
+        "<string>"
+      ],
+      "log.event.name": "install.pnfe",
+      "requested.packages": [
+        "<string>"
+      ],
+      "truncated": false
+    },
+    "create.pnfe": {
+      "command": "create",
+      "event.schema_version": "1",
+      "exception.missing_specs": [
+        "<string>"
+      ],
+      "exception.name": "<string>",
+      "install.channel_priority": "<string>",
+      "install.channels": [
+        "<string>"
+      ],
+      "log.event.name": "create.pnfe",
+      "requested.packages": [
+        "<string>"
+      ],
+      "truncated": false
+    },
+    "install.success": {
+      "command": "install",
+      "event.schema_version": "1",
+      "install.channel_priority": "<string>",
+      "install.channels": [
+        "<string>"
+      ],
+      "log.event.name": "install.success",
+      "requested.packages": [
+        "<string>"
+      ],
+      "resolved.packages": [
+        "<string>"
+      ],
+      "truncated": false
+    },
+    "create.success": {
+      "command": "create",
+      "event.schema_version": "1",
+      "install.channel_priority": "<string>",
+      "install.channels": [
+        "<string>"
+      ],
+      "log.event.name": "create.success",
+      "requested.packages": [
+        "<string>"
+      ],
+      "resolved.packages": [
+        "<string>"
+      ],
+      "truncated": false
+    }
+  }
+}
