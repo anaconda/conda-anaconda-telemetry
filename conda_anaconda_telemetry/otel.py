@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 #: Schema version for the created signal,
 #: bump manually whenever this contents/shape change.
-SIGNAL_VERSION = "1"
+SIGNAL_VERSION = "2"
 
 
 #: These two limits below mirror what is in the HTTP-backend.
@@ -271,7 +271,7 @@ def _truncate(
 def _get_command_attributes(
     *, command: str, channels: list[str], requested_names: list[str]
 ) -> tuple[dict[str, Any], bool]:
-    """Build fields shared by install/create error and success events."""
+    """Build fields shared by command error and success events."""
     safe_channels, channels_truncated = _truncate(
         [
             channel if channel in KNOWN_INSTALL_CHANNELS else OTHER_CHANNEL_LABEL
@@ -325,22 +325,17 @@ def get_success_attributes(
     requested_names: list[str],
     resolved_packages: dict[str, list[str]],
 ) -> dict[str, Any]:
-    """Build attributes for an install/create success signal."""
+    """Build attributes for a success signal."""
     attributes, truncated = _get_command_attributes(
         command=command, channels=channels, requested_names=requested_names
     )
-    unlinked, unlinked_truncated = _truncate(resolved_packages["unlinked"])
-    linked, linked_truncated = _truncate(resolved_packages["linked"])
+    resolved, resolved_truncated = _truncate(resolved_packages) 
 
-<<<<<<< HEAD
-    return {
-        **attributes,
-        "resolved.packages": resolved,
-        "truncated": truncated or resolved_truncated,
-    }
-=======
     if command in ("install", "create"):
         # Only these commands have a resolved package list.
         attributes["resolved.packages"] = resolved
         attributes["truncated"] = truncated or resolved_truncated
->>>>>>> bee84f1 (Add remove attributes and tests)
+    attributes["resolved.packages"] = resolved_packages
+    attributes["truncated"] = truncated or resolved_truncated
+
+    return attributes

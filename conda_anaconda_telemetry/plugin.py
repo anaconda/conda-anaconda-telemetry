@@ -35,6 +35,8 @@ class TelemetryCommand(str, Enum):
 
     CREATE = "create"
     INSTALL = "install"
+    REMOVE = "remove"
+    UPDATE = "update"
 
 
 @dataclass
@@ -75,23 +77,7 @@ def capture_requested_packages(
 ) -> None:
     """Pre-solve hook to extract and save requested package names from specs."""
     if context.plugins.anaconda_telemetry and command_request.command is not None:
-<<<<<<< HEAD
         command_request.requested_names = package_names(list(specs_to_add))
-=======
-        if (
-            command_request.command == TelemetryCommand.UPDATE
-            and command_request.update_all
-        ):
-            command_request.requested_names = []
-            return
-
-        specs = (
-            specs_to_remove
-            if command_request.command == TelemetryCommand.REMOVE
-            else specs_to_add
-        )
-        command_request.requested_names = package_names(list(specs))
->>>>>>> 7e5d21a (Pre-commit fixes)
 
 
 def capture_resolved_packages(
@@ -168,7 +154,6 @@ def report_success(command: str) -> None:
         request = command_request
         if request.command is None or request.requested_names is None:
             return
-<<<<<<< HEAD
         # Skip success telemetry when no post-solve result was captured.
         if request.resolved_packages is None or request.channels is None:
             return
@@ -183,58 +168,6 @@ def report_success(command: str) -> None:
             logger.debug(
                 "Failed to gather telemetry attributes for %s", command, exc_info=e
             )
-=======
-
-        if request.command is TelemetryCommand.SEARCH:
-            if request.search_term is None:
-                return
-
-            attributes = get_search_attributes(request.search_term)
-
-        elif request.command is TelemetryCommand.REMOVE:
-            if request.requested_names is None:
-                return
-
-            attributes = get_remove_attributes(request.requested_names)
-
-        elif request.command is TelemetryCommand.UPDATE:
-            if request.requested_names is None:
-                return
-
-            attributes = get_update_attributes(
-                requested_names=request.requested_names, update_all=request.update_all
-            )
-
-        elif request.command in {
-            TelemetryCommand.CREATE,
-            TelemetryCommand.INSTALL,
-        }:
-            # These flags reach this hook when there is nothing left to install.
-            if context.dry_run or context.download_only:
-                return
-
-            if (
-                request.requested_names is None
-                or request.resolved_packages is None
-                or request.channels is None
-            ):
-                return
-
-            try:
-                attributes = get_success_attributes(
-                    command=request.command.value,
-                    channels=request.channels,
-                    requested_names=request.requested_names,
-                    resolved_packages=request.resolved_packages,
-                )
-            except Exception as e:
-                logger.debug(
-                    "Failed to gather telemetry attributes for %s", command, exc_info=e
-                )
-                return
-
-        else:
->>>>>>> 7e5d21a (Pre-commit fixes)
             return
         try:
             telemetry = AnacondaTelemetry()
