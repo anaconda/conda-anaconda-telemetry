@@ -186,6 +186,10 @@ def received_records() -> list[tuple[dict, dict, Any, Any]]:
     ]
 
 
+def without_service_instance_id(attrs: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in attrs.items() if k != "service.instance.id"}
+
+
 @pytest.mark.usefixtures("telemetry_env")
 def test_real_otlp_payload_received_by_local_collector(signal_schema: dict) -> None:
     """Send all four OTLP events without mocking the SDK and check what arrives."""
@@ -215,7 +219,12 @@ def test_real_otlp_payload_received_by_local_collector(signal_schema: dict) -> N
 
     for resource_attrs, log_attrs, scope, log_record in records:
         # Attribute names and fixed values must match the sample signal.
-        assert_matches_sample(resource_attrs, signal_schema["resource"])
+        # service.instance.id is only emitted by newer OpenTelemetry versions,
+        # so it is excluded from this comparison.
+        assert_matches_sample(
+            without_service_instance_id(resource_attrs),
+            without_service_instance_id(signal_schema["resource"]),
+        )
         assert_matches_sample(
             log_attrs, signal_schema["events"][log_attrs["log.event.name"]]
         )

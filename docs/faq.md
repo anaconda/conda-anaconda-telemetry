@@ -97,6 +97,7 @@ The signal version is `1`. It is sent as `event.schema_version`, which the plugi
 | `platform` | Name of the product platform that sends the signal (conda). | plugin | always |
 | `python.version` | Version of Python that runs conda. | sdk | always |
 | `schema.version` | Version of the SDK telemetry schema. It is not the same as `event.schema_version`. | sdk | always |
+| `service.instance.id` | ID of this instance of the sending service. The OpenTelemetry SDK sets it. | sdk | always |
 | `service.name` | Name of the sending service (conda-anaconda-telemetry). | plugin | always |
 | `service.version` | Version of the conda-anaconda-telemetry plugin. | plugin | always |
 | `telemetry.sdk.language` | Programming language of the OpenTelemetry SDK. | sdk | always |
