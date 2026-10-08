@@ -41,10 +41,10 @@ OVERSIZED_FIELD_INFO = {
     "name": "x" * (INSTALLER_INFO_FIELD_LENGTH_LIMIT + 10),
 }
 
-#: Expected result once the oversized field above is truncated to the cap
-OVERSIZED_FIELD_ATTRIBUTES = {
-    **INSTALLER_ATTRIBUTES,
-    "installer.name": "x" * INSTALLER_INFO_FIELD_LENGTH_LIMIT,
+#: Sample metadata with a field exactly at INSTALLER_INFO_FIELD_LENGTH_LIMIT
+MAX_LENGTH_FIELD_INFO = {
+    **INSTALLER_INFO,
+    "name": "x" * INSTALLER_INFO_FIELD_LENGTH_LIMIT,
 }
 
 #: Metadata whose serialized size exceeds INSTALLER_INFO_FILE_SIZE_LIMIT
@@ -61,10 +61,11 @@ OVERSIZED_FILE_INFO = {
         pytest.param(None, {}, id="missing-file"),
         pytest.param("not valid json", {}, id="malformed-json"),
         pytest.param(json.dumps({"name": "Foo"}), {}, id="missing-fields"),
+        pytest.param(json.dumps(OVERSIZED_FIELD_INFO), {}, id="oversized-field"),
         pytest.param(
-            json.dumps(OVERSIZED_FIELD_INFO),
-            OVERSIZED_FIELD_ATTRIBUTES,
-            id="oversized-field",
+            json.dumps(MAX_LENGTH_FIELD_INFO),
+            {**INSTALLER_ATTRIBUTES, "installer.name": MAX_LENGTH_FIELD_INFO["name"]},
+            id="max-length-field",
         ),
         pytest.param(json.dumps(OVERSIZED_FILE_INFO), {}, id="oversized-file"),
     ],
