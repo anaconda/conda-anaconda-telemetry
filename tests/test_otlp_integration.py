@@ -166,7 +166,8 @@ def test_real_otlp_payload_received_by_local_collector(
     resource_attrs = {
         kv.key: otlp_value(kv.value) for kv in resource_logs.resource.attributes
     }
-    assert set(resource_attrs) == {
+    # service.instance.id is only emitted by newer OpenTelemetry versions
+    assert set(resource_attrs) - {"service.instance.id"} == {
         "aau.anaconda_auth.token",
         "aau.client.token",
         "aau.environment.token",
