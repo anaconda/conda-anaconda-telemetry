@@ -72,6 +72,12 @@ repos:
       - id: check-useless-excludes
   - repo: local
     hooks:
+      - id: faq-signal-docs
+        name: check generated FAQ
+        entry: python scripts/update_docs.py --check
+        language: python
+        pass_filenames: false
+        files: ^(docs/faq\.md|schema/.*|scripts/update_docs\.py)$
       - id: git-diff
         name: git diff
         entry: git diff --exit-code
