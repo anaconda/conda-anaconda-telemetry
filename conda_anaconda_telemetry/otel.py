@@ -25,6 +25,7 @@ from conda.models.match_spec import MatchSpec
 from conda_anaconda_telemetry import APP_NAME, APP_VERSION
 from conda_anaconda_telemetry.resource_attributes import (
     get_conda_attributes,
+    get_conda_build_attributes,
     get_installer_attributes,
 )
 
@@ -38,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 #: Schema version for the created signal,
 #: bump manually whenever this contents/shape change.
-SIGNAL_VERSION = "1"
+SIGNAL_VERSION = "2"
 
 #: Placeholder item limit for list-valued event attributes.
 LIST_ITEM_LIMIT = 50
@@ -143,6 +144,7 @@ class AnacondaTelemetry:
         for key, value in {
             **get_installer_attributes(),
             **get_conda_attributes(),
+            **get_conda_build_attributes(),
         }.items():
             setattr(attributes, key, value)
         return attributes
@@ -283,8 +285,40 @@ def get_success_attributes(
     )
     resolved, resolved_truncated = _truncate(resolved_packages)
 
+    if command in ("install", "create"):
+        attributes["resolved.packages"] = resolved
+        attributes["truncated"] = truncated or resolved_truncated
+
+    return attributes
+
+
+def get_search_attributes(search_term: str) -> dict[str, Any]:
+    """Build attributes for a search signal."""
     return {
-        **attributes,
-        "resolved.packages": resolved,
-        "truncated": truncated or resolved_truncated,
+        "command": "search",
+        "search.term": search_term,
+    }
+
+
+def get_remove_attributes(requested_names: list[str]) -> dict[str, Any]:
+    """Build attributes for a remove signal."""
+    requested, truncated = _truncate(requested_names)
+    return {
+        "command": "remove",
+        "requested.packages": requested,
+        "truncated": truncated,
+    }
+
+
+def get_update_attributes(
+    *, requested_names: list[str], update_all: bool
+) -> dict[str, Any]:
+    """Build attributes for an update signal."""
+    requested, truncated = _truncate(requested_names)
+
+    return {
+        "command": "update",
+        "update.all": update_all,
+        "requested.packages": requested,
+        "truncated": truncated,
     }

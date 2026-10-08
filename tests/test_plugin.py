@@ -147,7 +147,7 @@ def test_conda_pre_commands_registration() -> None:
 
     assert pre_command.name == "conda-anaconda-telemetry-pre-command"
     assert pre_command.action is capture_command
-    assert pre_command.run_for == {"create", "install"}
+    assert pre_command.run_for == {"create", "install", "remove", "search", "update"}
 
 
 def test_conda_pre_solves_registration() -> None:
@@ -164,7 +164,7 @@ def test_conda_post_commands_registration() -> None:
 
     assert post_command.name == "conda-anaconda-telemetry-post-command"
     assert post_command.action is report_success
-    assert post_command.run_for == {"create", "install"}
+    assert post_command.run_for == {"create", "install", "remove", "search", "update"}
 
 
 def test_conda_post_solves_registration() -> None:
@@ -180,8 +180,8 @@ def test_conda_post_solves_registration() -> None:
     [
         ("install", plugin_module.TelemetryCommand.INSTALL),
         ("create", plugin_module.TelemetryCommand.CREATE),
-        ("remove", None),
-        ("update", None),
+        ("remove", plugin_module.TelemetryCommand.REMOVE),
+        ("update", plugin_module.TelemetryCommand.UPDATE),
     ],
 )
 def test_capture_command(
@@ -228,6 +228,8 @@ def test_capture_command_disabled_plugin(mocker: MockerFixture) -> None:
     [
         (True, plugin_module.TelemetryCommand.INSTALL, ["numpy", "python"]),
         (True, plugin_module.TelemetryCommand.CREATE, ["numpy", "python"]),
+        (True, plugin_module.TelemetryCommand.REMOVE, ["numpy", "python"]),
+        (True, plugin_module.TelemetryCommand.UPDATE, ["numpy", "python"]),
         # Not captured as supported (e.g. a solve triggered by another command,
         # since conda calls this hook unconditionally).
         (True, None, None),
@@ -249,11 +251,30 @@ def test_capture_requested_packages(
     )
     plugin_module.command_request.command = captured_command
 
+    specs = frozenset({MatchSpec("numpy"), MatchSpec("python >=3.11")})
+
     capture_requested_packages(
-        frozenset({MatchSpec("numpy"), MatchSpec("python >=3.11")}), frozenset()
+        frozenset()
+        if captured_command == plugin_module.TelemetryCommand.REMOVE
+        else specs,
+        specs
+        if captured_command == plugin_module.TelemetryCommand.REMOVE
+        else frozenset(),
     )
 
     assert plugin_module.command_request.requested_names == expected_names
+
+
+def test_capture_requested_packages_update_all(mocker: MockerFixture) -> None:
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    plugin_module.command_request.command = plugin_module.TelemetryCommand.UPDATE
+    plugin_module.command_request.update_all = True
+
+    capture_requested_packages(frozenset(), frozenset())
+
+    assert plugin_module.command_request.requested_names == []
 
 
 def test_capture_resolved_packages(mocker: MockerFixture) -> None:
@@ -285,6 +306,24 @@ def test_capture_resolved_packages_records_empty_solve(mocker: MockerFixture) ->
     assert plugin_module.command_request.resolved_packages == []
 
 
+def test_capture_search_command(mocker: MockerFixture) -> None:
+    """The search term matches the user's input."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
+    )
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context._argparse_args",
+        mocker.MagicMock(match_spec="conda-forge::numpy>=2"),
+    )
+
+    capture_command("search")
+
+    assert (
+        plugin_module.command_request.command == plugin_module.TelemetryCommand.SEARCH
+    )
+    assert plugin_module.command_request.search_term == "conda-forge::numpy>=2"
+
+
 @pytest.mark.parametrize("command_name", ["install", None])
 def test_clear_command_resets_state(command_name: str | None) -> None:
     """clear_command() resets all captured state regardless of its argument."""
@@ -292,6 +331,7 @@ def test_clear_command_resets_state(command_name: str | None) -> None:
     plugin_module.command_request.requested_names = ["numpy"]
     plugin_module.command_request.channels = ["defaults"]
     plugin_module.command_request.resolved_packages = [RESOLVED_PACKAGE]
+    plugin_module.command_request.search_term = "conda-forge::numpy>=2"
 
     clear_command(command_name)
 
@@ -299,6 +339,7 @@ def test_clear_command_resets_state(command_name: str | None) -> None:
     assert plugin_module.command_request.requested_names is None
     assert plugin_module.command_request.channels is None
     assert plugin_module.command_request.resolved_packages is None
+    assert plugin_module.command_request.search_term is None
 
 
 def test_post_commands_hook_clears_state_after_success(
@@ -550,6 +591,7 @@ def test_report_error_signal_payload_baseline(
             plugins=SimpleNamespace(anaconda_telemetry=True),
         ),
     )
+    mocker.patch.dict("sys.modules", {"conda_build": None})
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
@@ -785,3 +827,77 @@ def test_report_success_sends_event(
         f"{command}.success", "", mock_success_attributes
     )
     assert plugin_module.command_request.command is None
+
+
+def test_report_success_search_found(mocker: MockerFixture) -> None:
+    """A successful search reports the search term as found."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry",
+        True,
+    )
+
+    plugin_module.command_request.command = plugin_module.TelemetryCommand.SEARCH
+    plugin_module.command_request.search_term = "conda=26.7.2"
+
+    attributes = {
+        "command": "search",
+        "search.term": "conda=26.7.2",
+    }
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.get_search_attributes",
+        return_value=attributes,
+    )
+    telemetry = mocker.MagicMock()
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry",
+        return_value=telemetry,
+    )
+
+    report_success("search")
+
+    assert plugin_module.command_request.command is None
+    assert plugin_module.command_request.search_term is None
+
+
+def test_report_error_search_not_found(mocker: MockerFixture) -> None:
+    """A failed search sends the captured search term."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry",
+        True,
+    )
+
+    plugin_module.command_request.command = plugin_module.TelemetryCommand.SEARCH
+    plugin_module.command_request.search_term = "conda=26.6.1"
+
+    attributes = {
+        "command": "search",
+        "search.term": "conda=26.6.1",
+    }
+    get_attributes = mocker.patch(
+        "conda_anaconda_telemetry.plugin.get_search_attributes",
+        return_value=attributes,
+    )
+    telemetry = mocker.MagicMock()
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry",
+        return_value=telemetry,
+    )
+
+    event = SimpleNamespace(
+        exc_type=PackagesNotFoundInChannelsError,
+        exc_value=PackagesNotFoundInChannelsError(
+            ["conda=26.6.1"],
+            [],
+        ),
+    )
+
+    report_error(event)
+
+    get_attributes.assert_called_once_with("conda=26.6.1")
+    telemetry.send_event.assert_called_once_with(
+        "search.pnfe",
+        "",
+        attributes,
+    )
+    assert plugin_module.command_request.command is None
+    assert plugin_module.command_request.search_term is None
