@@ -137,6 +137,11 @@
       "owner": "sdk",
       "optional": false
     },
+    "service.instance.id": {
+      "description": "ID of this instance of the sending service. The OpenTelemetry SDK sets it.",
+      "owner": "sdk",
+      "optional": false
+    },
     "service.name": {
       "description": "Name of the sending service (conda-anaconda-telemetry).",
       "owner": "plugin",
