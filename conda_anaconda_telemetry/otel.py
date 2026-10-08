@@ -335,7 +335,3 @@ def get_success_attributes(
         # Only these commands have a resolved package list.
         attributes["resolved.packages"] = resolved
         attributes["truncated"] = truncated or resolved_truncated
-    attributes["resolved.packages"] = resolved_packages
-    attributes["truncated"] = truncated or resolved_truncated
-
-    return attributes
