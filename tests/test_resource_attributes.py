@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from conda_anaconda_telemetry.resource_attributes import (
+    INSTALLER_INFO_FIELD_LENGTH_LIMIT,
+    INSTALLER_INFO_FILE_SIZE_LIMIT,
     get_conda_attributes,
     get_installer_attributes,
 )
@@ -33,14 +35,39 @@ INSTALLER_ATTRIBUTES = {
     "installer.platform": INSTALLER_INFO["platform"],
 }
 
+#: Sample metadata with a field longer than INSTALLER_INFO_FIELD_LENGTH_LIMIT
+OVERSIZED_FIELD_INFO = {
+    **INSTALLER_INFO,
+    "name": "x" * (INSTALLER_INFO_FIELD_LENGTH_LIMIT + 10),
+}
+
+#: Sample metadata with a field exactly at INSTALLER_INFO_FIELD_LENGTH_LIMIT
+MAX_LENGTH_FIELD_INFO = {
+    **INSTALLER_INFO,
+    "name": "x" * INSTALLER_INFO_FIELD_LENGTH_LIMIT,
+}
+
+#: Metadata whose serialized size exceeds INSTALLER_INFO_FILE_SIZE_LIMIT
+OVERSIZED_FILE_INFO = {
+    **INSTALLER_INFO,
+    "name": "x" * INSTALLER_INFO_FILE_SIZE_LIMIT,
+}
+
 
 @pytest.mark.parametrize(
     "file_content,expected",
     [
-        (json.dumps(INSTALLER_INFO), INSTALLER_ATTRIBUTES),
-        (None, {}),  # file missing entirely
-        ("not valid json", {}),  # malformed JSON
-        (json.dumps({"name": "Foo"}), {}),  # missing required fields
+        pytest.param(json.dumps(INSTALLER_INFO), INSTALLER_ATTRIBUTES, id="valid"),
+        pytest.param(None, {}, id="missing-file"),
+        pytest.param("not valid json", {}, id="malformed-json"),
+        pytest.param(json.dumps({"name": "Foo"}), {}, id="missing-fields"),
+        pytest.param(json.dumps(OVERSIZED_FIELD_INFO), {}, id="oversized-field"),
+        pytest.param(
+            json.dumps(MAX_LENGTH_FIELD_INFO),
+            {**INSTALLER_ATTRIBUTES, "installer.name": MAX_LENGTH_FIELD_INFO["name"]},
+            id="max-length-field",
+        ),
+        pytest.param(json.dumps(OVERSIZED_FILE_INFO), {}, id="oversized-file"),
     ],
 )
 def test_get_installer_attributes(
@@ -49,7 +76,7 @@ def test_get_installer_attributes(
     file_content: str | None,
     expected: dict[str, str],
 ) -> None:
-    """File present/missing/malformed/partial never raises."""
+    """File present/missing/malformed/partial/oversized never raises."""
     if file_content is not None:
         (tmp_path / ".installer.info").write_text(file_content)
     # context.root_prefix is a read-only property, so the whole `context`
