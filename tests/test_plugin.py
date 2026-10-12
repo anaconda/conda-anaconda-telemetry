@@ -285,15 +285,14 @@ def test_capture_resolved_packages_records_empty_solve(mocker: MockerFixture) ->
     assert plugin_module.command_request.resolved_packages == []
 
 
-@pytest.mark.parametrize("command_name", ["install", None])
-def test_clear_command_resets_state(command_name: str | None) -> None:
-    """clear_command() resets all captured state regardless of its argument."""
+def test_clear_command_resets_state() -> None:
+    """clear_command() resets all captured state."""
     plugin_module.command_request.command = plugin_module.TelemetryCommand.INSTALL
     plugin_module.command_request.requested_names = ["numpy"]
     plugin_module.command_request.channels = ["defaults"]
     plugin_module.command_request.resolved_packages = [RESOLVED_PACKAGE]
 
-    clear_command(command_name)
+    clear_command()
 
     assert plugin_module.command_request.command is None
     assert plugin_module.command_request.requested_names is None

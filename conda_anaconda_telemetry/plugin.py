@@ -90,7 +90,7 @@ def capture_resolved_packages(
         ]
 
 
-def clear_command(_command_name: str | None = None) -> None:
+def clear_command() -> None:
     """Reset telemetry state.
 
     Runs after commands finish or inside error handling blocks when hooks fail.
