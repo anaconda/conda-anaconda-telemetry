@@ -53,6 +53,9 @@ LIST_BYTE_LIMIT = 500
 KNOWN_INSTALL_CHANNELS = frozenset({"defaults", "main", "main-x", "conda-forge"})
 OTHER_CHANNEL_LABEL = "other"
 
+#: Hosts accepted for a local collector set with ATEL_DEFAULT_ENDPOINT.
+_LOCAL_COLLECTOR_HOSTS = ("localhost", "127.0.0.1")
+
 # From running scripts/benchmark_timing.sh the slowest observed
 # flush (~2.3-2.9s outlier) is covered by the 3.0s timeout
 # without excessive stalling
@@ -62,6 +65,8 @@ _SHUTDOWN_TIMEOUT_SECONDS = 3.0
 @contextmanager
 def _ignore_otel_environment() -> Iterator[None]:
     """Ignore native OTel settings while initializing or emitting an event."""
+    # tuple() makes a copy of the names. Without it, removing a variable
+    # inside this loop raises "dictionary changed size during iteration".
     saved_env = {
         var: os.environ.pop(var, None)
         for var in tuple(os.environ)
@@ -112,9 +117,9 @@ class AnacondaTelemetry:
         default_endpoint = os.getenv("ATEL_DEFAULT_ENDPOINT")
         if default_endpoint is not None:
             parsed_endpoint = urlparse(default_endpoint)
-            if parsed_endpoint.scheme == "http" and parsed_endpoint.hostname in (
-                "localhost",
-                "127.0.0.1",
+            if (
+                parsed_endpoint.scheme == "http"
+                and parsed_endpoint.hostname in _LOCAL_COLLECTOR_HOSTS
             ):
                 self.default_endpoint = default_endpoint
 
@@ -135,7 +140,7 @@ class AnacondaTelemetry:
         # Manage shutdown ourselves (see shutdown() below) with a fixed timeout,
         # instead of letting the SDK register its own unbounded atexit handler.
         config.set_shutdown_on_exit(False)
-        if urlparse(self.default_endpoint).hostname in ("localhost", "127.0.0.1"):
+        if urlparse(self.default_endpoint).hostname in _LOCAL_COLLECTOR_HOSTS:
             # Local collectors still export over real OTLP, not the console.
             config.set_console_exporter(False)
         return config
