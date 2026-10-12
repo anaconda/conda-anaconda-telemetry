@@ -38,7 +38,7 @@ The Conda Anaconda Telemetry plugin functions by attaching additional telemetry 
 to HTTP request headers submitted to Anaconda channel servers. This is done by relying
 on the [conda plugin for request headers][conda-plugins-request-headers].
 
-The entire plugin consists of just a single `hooks.py` module and currently submits up to
+Request headers are implemented in the `hooks.py` module, which currently submits up to
 five headers per request. To respect size limits (typically 8KB), each header has been given
 a character limit, with `anaconda-telemetry-packages` getting the highest limit because it is
 inherently larger than the other headers. When a header's data is larger than its limit, the data is
@@ -54,6 +54,31 @@ Below is a table showing the current headers, along with their size limits:
 | `anaconda-telemetry-search`           | 500             |
 | `anaconda-telemetry-install`          | 500             |
 | `anaconda-telemetry-sys-info`         | 500             |
+
+In addition to request headers, the plugin reports discrete events over OpenTelemetry
+(OTLP) logs using the `anaconda-opentelemetry` package. This is done by the
+`AnacondaTelemetry` class in `otel.py`, which is used by `plugin.py` to report on the
+`install` and `create` commands.
+
+Similar to the headers, data sent over OTLP can also be truncated.
+List-valued attributes on these events, such as `requested.packages`, `resolved.packages`,
+and `install.channels`, are limited to 50 items and 500 bytes once serialized. When an
+attribute's data is larger than its limit, the data is truncated and the event's
+`truncated` attribute is set to `true`.
+
+Below is a table showing the currently reported events, along with what triggers them:
+
+| Event                | Trigger                                                |
+|-----------------------|---------------------------------------------------------|
+| `<command>.pnfe`      | `PackagesNotFoundInChannelsError` is raised            |
+| `<command>.success`   | The command completes and packages were linked        |
+
+Success events are skipped when the command is run with `--dry-run` or `--download-only`.
+
+Unlike the header mechanism, events are sent to a single pinned production endpoint
+(`https://public.telemetry.anaconda.com/v1/logs`) rather than attached to existing
+conda requests. Other endpoint overrides are ignored unless they point at a local
+loopback HTTP collector, for local testing only.
 
 ## Maintainer information
 
