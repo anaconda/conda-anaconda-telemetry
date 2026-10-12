@@ -121,7 +121,6 @@ jobs:
           - os: macos-15-intel
             conda-version: '25.9'
           - os: macos-15-intel
-            conda-version: '25.11'
         include:
           # Current stable conda and Python across supported operating systems
           - os: ubuntu-latest
