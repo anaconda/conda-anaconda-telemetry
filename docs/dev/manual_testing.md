@@ -10,7 +10,7 @@ the request headers.
 
 Make sure to begin with a new Miniconda install, and follow these steps:
 
-Install the conda 26.5.0 or later:
+Install conda 26.5.0 or later:
 
 ```
 conda install "conda>=26.5"
