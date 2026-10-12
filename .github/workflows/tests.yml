@@ -121,7 +121,6 @@ jobs:
           - os: macos-15-intel
             conda-version: '25.9'
           - os: macos-15-intel
-            conda-version: '25.11'
         include:
           # Current stable conda and Python across supported operating systems
           - os: ubuntu-latest
@@ -217,8 +216,6 @@ jobs:
       - name: Run Tests
         # Windows is sensitive to long paths, using `--basetemp=${{ runner.temp }} to
         # keep the test directories shorter
-        env:
-          ATEL_ENVIRONMENT: test  # Needed for test_otel.py
         run: >
           conda run --name test
           pytest
