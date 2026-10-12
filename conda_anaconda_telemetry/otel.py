@@ -41,10 +41,11 @@ logger = logging.getLogger(__name__)
 #: bump manually whenever this contents/shape change.
 SIGNAL_VERSION = "1"
 
-#: Placeholder item limit for list-valued event attributes.
-LIST_ITEM_LIMIT = 50
 
-#: Placeholder UTF-8 byte limit for list-valued event attributes.
+#: These two limits below mirror what is in the HTTP-backend.
+#: Item limit for list-valued event attributes.
+LIST_ITEM_LIMIT = 50
+#: UTF-8 byte limit for list-valued event attributes.
 LIST_BYTE_LIMIT = 500
 
 #: Channel names allowed in the install.channels payload; anything else is
