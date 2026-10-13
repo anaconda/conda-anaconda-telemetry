@@ -246,11 +246,11 @@ Verify the S3 PNFE shape with `log.event.name` `create.pnfe` and `command` `crea
 
 #### S5 - Opt-out
 
-This scenario uses a temporary QA-only conda configuration file so it never changes the tester's normal `.condarc`. Point `CONDARC` at that file only for the S5 commands below, then restore it.
+This scenario uses a temporary QA-only conda configuration file so it never changes the tester's normal `.condarc`. Point `CONDARC` at that file only for the S5 commands below, then restore it. The file name must end in `.yml` because conda ignores other file names. After setting `CONDARC`, run `conda config --show plugins.anaconda_telemetry` and confirm it prints `false` before running the `create` commands.
 
 ```shell
 # Linux and macOS
-qa_condarc=/tmp/conda-telemetry-qa-condarc
+qa_condarc=/tmp/conda-telemetry-qa-condarc.yml
 saved_condarc="${CONDARC-}"
 conda config --file "$qa_condarc" --set plugins.anaconda_telemetry false
 CONDARC="$qa_condarc" conda create -y -n qa-s5 -c defaults zlib
@@ -263,7 +263,7 @@ rm -f "$qa_condarc"
 
 ```powershell
 # Windows PowerShell
-$qaCondarc = Join-Path $env:TEMP "conda-telemetry-qa-condarc"
+$qaCondarc = Join-Path $env:TEMP "conda-telemetry-qa-condarc.yml"
 $savedCondarc = $env:CONDARC
 conda config --file $qaCondarc --set plugins.anaconda_telemetry false
 $env:CONDARC = $qaCondarc
@@ -316,7 +316,7 @@ Then run:
 
     conda create -n qa-s6-file --dry-run -c file:///path/to/local-channel -c conda-forge -c defaults definitely-not-a-real-package-xyz
 
-(On Windows, use the `file:///` URI form of the local path, e.g. `file:///C:/Users/you/AppData/Local/Temp/qa-local-channel`.)
+(📌 **On Windows**, use the `file:///` URI form of the local path, e.g. `file:///C:/Users/you/AppData/Local/Temp/qa-local-channel`.)
 
 Confirm the local folder is also reported as `other`, and that no folder path, web address, or private info shows up anywhere in the report. Also confirm the command emits `create.pnfe`.
 
@@ -379,8 +379,16 @@ Verify both commands complete **without** an `install.success` event.
 `conda create --clone` and `conda create --file` with an `@EXPLICIT` package list both bypass conda's solve step. Because no solve happens, the plugin never captures requested or resolved packages, so `create.success` is not emitted, even though the command completes successfully. This is a known, confirmed 0.4.0 behavior tracked in [#246](https://github.com/anaconda/conda-anaconda-telemetry/issues/246), not a bug to file.
 
 ```shell
+# Linux and macOS
 conda create -y -n qa-s8-clone --clone qa-s1
 conda list -n qa-s1 --explicit > qa-s1-explicit.txt
+conda create -y -n qa-s8-explicit --file qa-s1-explicit.txt
+```
+
+```powershell
+# Windows PowerShell (the `>` operator writes UTF-16, which conda cannot read, so write ASCII)
+conda create -y -n qa-s8-clone --clone qa-s1
+conda list -n qa-s1 --explicit | Set-Content -Encoding ascii qa-s1-explicit.txt
 conda create -y -n qa-s8-explicit --file qa-s1-explicit.txt
 ```
 
@@ -447,7 +455,7 @@ ATEL_DEFAULT_ENDPOINT=http://127.0.0.1:4999 conda create -n qa-s12 --dry-run -c 
 # Windows PowerShell
 $env:ATEL_DEFAULT_ENDPOINT = "http://127.0.0.1:4999"
 conda create -n qa-s12 --dry-run -c defaults definitely-not-a-real-package-xyz
-$env:ATEL_ENVIRONMENT = "test"
+$env:ATEL_DEFAULT_ENDPOINT = "http://127.0.0.1:4318"
 ```
 
 With nothing listening on port 4999, verify normal PNFE output and exit code, no traceback, and that the command finishes within a few seconds rather than hanging (see Performance Considerations).
@@ -511,7 +519,6 @@ Repeat S1-S5 on Windows 11, macOS arm64, and Linux x86_64. Verify `os.type`, `os
 ## 7. Known Issues & Limitations
 
 * Only `PackagesNotFoundInChannelsError` is reported; `UnsatisfiableError`, network errors, `CondaValueError`, and other failures intentionally emit nothing. No event in these cases is expected, not a bug.
-* Existing HTTP-header telemetry remains active alongside OTel telemetry in 0.4.0; don't mistake this legacy traffic for the new OTel events when inspecting network activity.
 * `install.channels` omits channels supplied only by an environment YAML file passed with `--file`; only channels configured through `.condarc` or the command line are captured. Tracked in [#237](https://github.com/anaconda/conda-anaconda-telemetry/issues/237).
 * `conda create --clone` and `conda create --file` with an `@EXPLICIT` package list bypass conda's solve step, so no `create.success` event is emitted even though the command completes successfully. This is expected, not a bug. Tracked in [#246](https://github.com/anaconda/conda-anaconda-telemetry/issues/246).
 
@@ -552,7 +559,7 @@ Run these additional checks:
 
 ## 10. Timeline
 
-**Ready for Testing Date**: [DD/MM/YYYY]
+**Ready for Testing Date**: [13/10/2026]
 
 **Target Completion Date**: [DD/MM/YYYY]
 
