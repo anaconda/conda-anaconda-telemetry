@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import anaconda_opentelemetry.signals as sig
 import opentelemetry._logs._internal as logs_internal
 import pytest
+from anaconda_opentelemetry.attributes import ResourceAttributes
 from anaconda_opentelemetry.logging import _AnacondaLogger
 from conda import __version__ as conda_version
 from conda.exceptions import PackagesNotFoundError
@@ -25,6 +26,7 @@ from conda_anaconda_telemetry.otel import (
     LIST_ITEM_LIMIT,
     OTHER_CHANNEL_LABEL,
     AnacondaTelemetry,
+    _service_version,
     get_install_attributes,
     get_success_attributes,
     package_names,
@@ -72,6 +74,21 @@ def test_anaconda_telemetry(
 
     # Confirm telemetry initialized successfully
     assert getattr(sig, "__ANACONDA_TELEMETRY_INITIALIZED") is True
+
+
+@pytest.mark.parametrize(
+    "version, expected",
+    [
+        ("0.4.0", "0.4.0"),
+        ("0.3.1.8+g93b3784", "0.3.1.8"),
+        ("0.3.1.dev67+gabc1234", "0.3.1"),
+        ("0.3.1.dev67+gabc1234.invalid", "0.3.1"),
+    ],
+)
+def test_service_version(version: str, expected: str) -> None:
+    """Dev and local version parts are removed, so the SDK accepts the value."""
+    assert _service_version(version) == expected
+    ResourceAttributes("conda-anaconda-telemetry", _service_version(version))
 
 
 @pytest.mark.parametrize(

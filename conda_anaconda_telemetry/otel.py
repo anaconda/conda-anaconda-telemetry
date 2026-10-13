@@ -63,6 +63,14 @@ _LOCAL_COLLECTOR_HOSTS = ("localhost", "127.0.0.1")
 _SHUTDOWN_TIMEOUT_SECONDS = 3.0
 
 
+def _service_version(version: str) -> str:
+    """Format the version to be accepted by OTel SDK.
+
+    Drop the dev and local (``+...``) parts, otherwise a ValueError is raised.
+    """
+    return version.partition(".dev")[0].partition("+")[0]
+
+
 @contextmanager
 def _ignore_otel_environment() -> Iterator[None]:
     """Ignore native OTel settings while initializing or emitting an event."""
@@ -96,7 +104,7 @@ class AnacondaTelemetry:
     """Anaconda Telemetry configuration and control class."""
 
     service_name: str = APP_NAME
-    service_version: str = APP_VERSION.partition(".dev")[0]
+    service_version: str = _service_version(APP_VERSION)
     platform: str = "conda"
     environment: Environment = field(
         init=False,
