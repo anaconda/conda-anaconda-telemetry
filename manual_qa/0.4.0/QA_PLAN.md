@@ -30,7 +30,7 @@
 ```
 python >=3.10
 conda >=26.9.2
-anaconda-opentelemetry >=1.2.4
+anaconda-opentelemetry >=1.2.5
 conda-anaconda-telemetry 0.4.0 canary (installed in the base environment)
 ```
 
