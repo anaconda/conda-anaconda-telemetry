@@ -29,8 +29,8 @@
 
 ```
 python >=3.10
-conda >=26.7.2
-anaconda-opentelemetry >=1.2.4
+conda >=26.9.2
+anaconda-opentelemetry >=1.2.5
 conda-anaconda-telemetry 0.4.0 canary (installed in the base environment)
 ```
 
@@ -58,7 +58,7 @@ bash /tmp/miniconda.sh -b -p ~/conda-qa
 
 # Step 4: Install conda and the latest plugin canary in base.
 conda install -n base -c distribution-plugins/label/dev -c defaults \
-  "conda=26.7.2" conda-anaconda-telemetry
+  "conda=26.9.2" conda-anaconda-telemetry
 ```
 
 #### Windows (64-bit, PowerShell)
@@ -72,7 +72,7 @@ Start-Process -Wait "$env:TEMP\miniconda.exe" -ArgumentList "/S /D=$env:USERPROF
 
 # Step 3: Open Anaconda PowerShell Prompt and install conda and the latest plugin canary in base.
 conda install -n base -c distribution-plugins/label/dev -c defaults `
-  "conda=26.7.2" conda-anaconda-telemetry
+  "conda=26.9.2" conda-anaconda-telemetry
 ```
 
 ### Verification
@@ -82,7 +82,7 @@ conda install -n base -c distribution-plugins/label/dev -c defaults `
 conda info
 
 # Confirm package versions.
-conda --version                                      # expected: 26.7.2
+conda --version                                      # expected: 26.9.2
 conda list -n base conda-anaconda-telemetry          # expected: a canary version with a Git hash
 conda list -n base anaconda-opentelemetry            # expected: 1.2.4 or newer
 
@@ -434,7 +434,7 @@ conda list -n qa-s1
 conda env create -n qa-s11 -f environment.yml
 ```
 
-Verify `remove`, `update`, `search`, and `list` emit no OTel event. With `conda 26.7.2` or newer, verify `conda env create` emits one `create.success` event with `command` `create`, `requested.packages` `['zlib']`, and `resolved.packages` containing the packages installed into the new environment.
+Verify `remove`, `update`, `search`, and `list` emit no OTel event. With `conda 26.9.2` or newer, verify `conda env create` emits one `create.success` event with `command` `create`, `requested.packages` `['zlib']`, and `resolved.packages` containing the packages installed into the new environment.
 
 #### S12 - Collector unreachable or offline
 
