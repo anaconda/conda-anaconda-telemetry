@@ -22,6 +22,24 @@ We currently collect the following information when this plugin is installed:
   `package-b` will be tracked)
 - Usage tokens provided by `anaconda-anon-usage` (e.g. a client token and a per-session token). For the exact fields that are exported - see [below](#ongoing-migration-to-use-otel).
 
+### How are private channels handled in HTTP headers?
+
+The channel and installed-package headers include only channels with explicitly
+allowed public URLs. Other channels and their installed packages are omitted.
+Installed-package entries keep the channel, subdirectory, name, version, and build
+format, using a fixed public channel label instead of any user-defined alias.
+
+Search and install headers contain package names only. URL and local-file specs
+are omitted, including named URL specs. Unqualified package names are omitted
+when any configured channel is private because their source is not yet known.
+Explicitly public channel specs can still be reported in that case. Install
+headers use specs captured before solving. When `--file` is used, only specs with
+an explicitly public channel are included because a YAML file can supply private
+channels that are absent from conda's global channel configuration. Before the
+pre-solve capture runs, the install header is empty.
+
+These rules apply to HTTP headers. OpenTelemetry fields are described below.
+
 ## Which commands are you tracking?
 
 We only track commands that make network requests. This includes the following:

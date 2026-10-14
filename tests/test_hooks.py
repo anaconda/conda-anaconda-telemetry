@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
-from conda.base.context import context
+from conda.models.records import PackageRecord
 
 from conda_anaconda_telemetry.hooks import (
     HEADER_CHANNELS,
@@ -34,24 +34,27 @@ if TYPE_CHECKING:
 #: Host used across all tests
 TEST_HOST = "repo.anaconda.com"
 
-TEST_PACKAGES = [
-    "defaults/osx-arm64::sqlite-3.45.3-h80987f9_0",
-    "defaults/osx-arm64::pcre2-10.42-hb066dcc_1",
-    "defaults/osx-arm64::libxml2-2.13.1-h0b34f26_2",
-]
-
-
-def mock_list_packages(*args: tuple, **kwargs: dict) -> tuple:  # noqa: ARG001
-    return 0, TEST_PACKAGES
-
 
 @pytest.fixture(autouse=True)
-def packages(mocker: MockerFixture) -> list:
-    """
-    Mocks ``conda_anaconda_telemetry.hooks.list_packages``
-    """
-    mocker.patch("conda_anaconda_telemetry.hooks.list_packages", mock_list_packages)
-    return TEST_PACKAGES
+def packages(mocker: MockerFixture) -> None:
+    """Keep header tests independent of packages installed on the test host."""
+    records = tuple(
+        PackageRecord(
+            name=name,
+            version=version,
+            build=build,
+            build_number=0,
+            channel="https://repo.anaconda.com/pkgs/main",
+            subdir="osx-arm64",
+        )
+        for name, version, build in (
+            ("sqlite", "3.45.3", "h80987f9_0"),
+            ("pcre2", "10.42", "hb066dcc_1"),
+            ("libxml2", "2.13.1", "h0b34f26_2"),
+        )
+    )
+    prefix_data = mocker.patch("conda_anaconda_telemetry.hooks.PrefixData")
+    prefix_data.return_value.iter_records.return_value = records
 
 
 @pytest.mark.parametrize(
@@ -164,10 +167,10 @@ def test_install_headers(
         "https://private.example.com/t/tk-123-456/channel",  # fake anaconda token
     ],
 )
-def test_get_channel_urls_strips_credentials(
+def test_get_channel_urls_omits_private_channels(
     mocker: MockerFixture, channel: str
 ) -> None:
-    """Channel URLs must not leak embedded Basic Auth credentials or tokens."""
+    """Private channel URLs must be omitted along with credentials and tokens."""
     mocker.patch(
         "conda.base.context.Context.channels",
         new_callable=mocker.PropertyMock,
@@ -176,10 +179,7 @@ def test_get_channel_urls_strips_credentials(
 
     urls = get_channel_urls()
 
-    assert urls == (
-        f"https://private.example.com/channel/{context.subdir}",
-        "https://private.example.com/channel/noarch",
-    )
+    assert urls == ()
 
 
 def test_disabled_plugin(mocker: MockerFixture) -> None:
@@ -255,7 +255,7 @@ def test_conda_request_headers_with_non_matching_url() -> None:
         ),
         (
             ["conda", "search", "package"],
-            MagicMock(match_spec=["package"], cmd="search"),
+            MagicMock(match_spec="package", cmd="search"),
         ),
         (["conda", "update", "package"], MagicMock(packages=["package"], cmd="update")),
     ),
