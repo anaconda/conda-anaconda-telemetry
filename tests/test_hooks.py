@@ -5,9 +5,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
+from urllib.parse import urlsplit
 
 import pytest
 from conda.base.context import context
+from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 
 from conda_anaconda_telemetry.hooks import (
@@ -294,8 +296,17 @@ def test_known_public_channel_urls_keep_name(
     """
     Package names from every known public channel URL are kept
     """
+    # We test with conda 26.5. It turns a channel URL in a spec into a
+    # conda.anaconda.org URL, so the URL no longer matches. Build the Channel
+    # from its parts instead.
+    # This special handling is not required with conda 26.7.2 and newer
+    parsed = urlsplit(channel_url)
+    location, _, name = parsed.path.rpartition("/")
+    channel = Channel(
+        scheme=parsed.scheme, location=parsed.netloc + location, name=name
+    )
     monkeypatch.setattr(
-        requested_packages, "specs", (MatchSpec(f"{channel_url}::pkg_foo"),)
+        requested_packages, "specs", (MatchSpec(name="pkg_foo", channel=channel),)
     )
 
     assert get_install_arguments() == ("pkg_foo",)
