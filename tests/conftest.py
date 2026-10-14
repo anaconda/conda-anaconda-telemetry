@@ -15,10 +15,12 @@ SCHEMA_DIR = Path(__file__).resolve().parents[1] / "schema"
 @pytest.fixture
 def signal_schema() -> dict:
     """Return the sample signal."""
-    return json.loads((SCHEMA_DIR / "signal_schema.json").read_text())
+    return json.loads((SCHEMA_DIR / "signal_schema.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture
 def signal_description() -> dict:
     """Return the descriptions of the signal fields."""
-    return json.loads((SCHEMA_DIR / "signal_schema_description.json").read_text())
+    return json.loads(
+        (SCHEMA_DIR / "signal_schema_description.json").read_text(encoding="utf-8")
+    )

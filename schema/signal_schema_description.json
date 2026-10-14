@@ -75,7 +75,7 @@
       "optional": false
     },
     "conda.ci_detected": {
-      "description": "Whether the `CI` environment variable is set to a true value (`true` or `false`).",
+      "description": "Whether conda detected a CI environment, derived from the `CI` environment variable.",
       "owner": "plugin",
       "optional": false
     },
@@ -140,7 +140,8 @@
     "service.instance.id": {
       "description": "ID of this instance of the sending service. The OpenTelemetry SDK sets it.",
       "owner": "sdk",
-      "optional": false
+      "optional": true,
+      "condition": "The installed `opentelemetry-sdk` is version 1.43.0 or newer."
     },
     "service.name": {
       "description": "Name of the sending service (conda-anaconda-telemetry).",

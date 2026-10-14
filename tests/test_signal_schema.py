@@ -84,14 +84,25 @@ def test_metadata_rules(signal_description: dict) -> None:
 
 
 def test_optional_resource_attributes(signal_description: dict) -> None:
-    """Only installer.* and aau.* resource attributes are optional."""
+    """Only installer.*, aau.* and service.instance.id attributes are optional."""
     optional = {k for k, v in signal_description["resource"].items() if v["optional"]}
     expected = {
         k
         for k in signal_description["resource"]
-        if k.startswith(("installer.", "aau."))
+        if k.startswith(("installer.", "aau.")) or k == "service.instance.id"
     }
     assert optional == expected
+
+
+def test_descriptions_have_no_table_separator(signal_description: dict) -> None:
+    """A `|` in a description would break the generated FAQ tables."""
+    descriptions = [
+        (name, meta["description"])
+        for section in signal_description.values()
+        for name, meta in section.items()
+    ]
+    for name, description in descriptions:
+        assert "|" not in description, name
 
 
 def test_event_descriptions(signal_description: dict) -> None:

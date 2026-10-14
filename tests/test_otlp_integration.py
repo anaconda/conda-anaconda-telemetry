@@ -219,7 +219,7 @@ def test_real_otlp_payload_received_by_local_collector(signal_schema: dict) -> N
 
     for resource_attrs, log_attrs, scope, log_record in records:
         # Attribute names and fixed values must match the sample signal.
-        # service.instance.id is only emitted by newer OpenTelemetry versions,
+        # service.instance.id is only emitted by opentelemetry-sdk >= 1.43.0,
         # so it is excluded from this comparison.
         assert_matches_sample(
             without_service_instance_id(resource_attrs),

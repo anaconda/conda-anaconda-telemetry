@@ -85,7 +85,7 @@ The signal version is `1`. It is sent as `event.schema_version`, which the plugi
 | `aau.session.token` | Token for the current run. It changes with each run. | sdk | optional: The `anaconda-anon-usage` package is installed. |
 | `aau.version` | Version of the `anaconda-anon-usage` package. | sdk | optional: The `anaconda-anon-usage` package is installed. |
 | `client.sdk.version` | Version of the Anaconda OpenTelemetry SDK that sends the signal. | sdk | always |
-| `conda.ci_detected` | Whether the `CI` environment variable is set to a true value (`true` or `false`). | plugin | always |
+| `conda.ci_detected` | Whether conda detected a CI environment, derived from the `CI` environment variable. | plugin | always |
 | `conda.version` | Version of conda that sends the signal. | plugin | always |
 | `environment` | Label of the deployment. It comes from the `ATEL_ENVIRONMENT` setting and is `production` by default. | plugin | always |
 | `installer.name` | Name of the installer that installed conda. | plugin | optional: The installer metadata file (.installer.info) in the base environment exists and is valid. |
@@ -97,7 +97,7 @@ The signal version is `1`. It is sent as `event.schema_version`, which the plugi
 | `platform` | Name of the product platform that sends the signal (conda). | plugin | always |
 | `python.version` | Version of Python that runs conda. | sdk | always |
 | `schema.version` | Version of the SDK telemetry schema. It is not the same as `event.schema_version`. | sdk | always |
-| `service.instance.id` | ID of this instance of the sending service. The OpenTelemetry SDK sets it. | sdk | always |
+| `service.instance.id` | ID of this instance of the sending service. The OpenTelemetry SDK sets it. | sdk | optional: The installed `opentelemetry-sdk` is version 1.43.0 or newer. |
 | `service.name` | Name of the sending service (conda-anaconda-telemetry). | plugin | always |
 | `service.version` | Version of the conda-anaconda-telemetry plugin. | plugin | always |
 | `telemetry.sdk.language` | Programming language of the OpenTelemetry SDK. | sdk | always |

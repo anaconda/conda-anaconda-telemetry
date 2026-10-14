@@ -34,11 +34,11 @@ The two `signal*.json` files are the single source of truth for what the plugin 
 The files, the real export and the FAQ must agree. This is enforced via tests and a pre-commit hook:
 
 - `tests/test_signal_schema.py` checks that the two files match each other and the
-  supported commands.
+  supported commands, and that only the optional resource attributes
+  (`installer.*`, `aau.*`, `service.instance.id`) are marked optional.
 - `tests/test_otlp_integration.py` compares the real OTLP export of all four events
-  to the sample.
-- `tests/test_resource_attributes.py` checks that the optional resource attributes
-  (`installer.*`, `aau.*`) stay within the schema.
+  to the sample. It checks that the attribute names are identical and that fixed
+  values are equal.
 - `scripts/update_docs.py` renders the FAQ section between the
   `GENERATED OTEL SIGNAL` markers. Do not edit that section by hand.
 
