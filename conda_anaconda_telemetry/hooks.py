@@ -9,12 +9,14 @@ import logging
 import re
 import time
 import typing
+from dataclasses import dataclass, field
 
 from conda.base.context import context
 from conda.cli.main_list import list_packages
 from conda.common.configuration import PrimitiveParameter
 from conda.common.url import mask_anaconda_token
-from conda.models.channel import all_channel_urls
+from conda.models.channel import Channel, all_channel_urls
+from conda.models.match_spec import MatchSpec
 from conda.plugins import hookimpl
 from conda.plugins.types import (
     CondaExceptionObserver,
@@ -98,6 +100,65 @@ REQUEST_HEADER_PATTERN = re.compile(
     re.VERBOSE,
 )
 
+# Anything not in this set, including unknown hosts or unlisted paths on a
+#: known host, is treated as private.
+KNOWN_PUBLIC_CHANNEL_URLS = frozenset(
+    {
+        "https://conda.anaconda.org/anaconda",
+        "https://conda.anaconda.org/conda-forge",
+        "https://conda.anaconda.org/main",
+        "https://conda.anaconda.org/main-x",
+        "https://conda.anaconda.org/msys2",
+        "https://conda.anaconda.org/r",
+        "https://repo.anaconda.com/pkgs/main",
+        "https://repo.anaconda.com/pkgs/msys2",
+        "https://repo.anaconda.com/pkgs/r",
+        "https://repo.anaconda.cloud/repo/main-x",
+    }
+)
+
+
+def is_public_channel(channel: Channel) -> bool:
+    """Return whether every base URL of ``channel`` is a known-public channel URL."""
+    return all(url in KNOWN_PUBLIC_CHANNEL_URLS for url in channel.base_urls)
+
+
+def _get_public_package_name(spec: MatchSpec) -> str | None:
+    """Return ``spec``'s package name, name only, if its channel is public.
+
+    Falls back to the currently configured channels when ``spec`` has no
+    explicit channel. Returns ``None`` if any resulting channel is private.
+    """
+    channel = spec.get("channel")
+    if channel is None and spec.get("url") is not None:
+        return None
+    channels = (
+        (channel,) if channel is not None else tuple(map(Channel, context.channels))
+    )
+    if not channels or not all(is_public_channel(c) for c in channels):
+        return None
+    return spec.name
+
+
+@dataclass
+class RequestedPackages:
+    """Tracks package specs requested by the current install/create command.
+
+    Populated by the pre-solve hook before any repodata requests are made.
+    """
+
+    specs: tuple[MatchSpec, ...] = field(default_factory=tuple)
+
+
+requested_packages = RequestedPackages()
+
+
+def capture_requested_specs(
+    specs_to_add: frozenset[MatchSpec], _specs_to_remove: frozenset[MatchSpec]
+) -> None:
+    """Pre-solve hook to extract and save requested package specs."""
+    requested_packages.specs = tuple(specs_to_add)
+
 
 def timer(func: Callable) -> Callable:
     """Log the duration of a function call."""
@@ -150,13 +211,15 @@ def get_package_list() -> tuple[str, ...]:
 
 
 def get_search_term() -> str:
-    """Retrieve the search term being used when search command is run."""
-    return context._argparse_args.match_spec
+    """Retrieve the package name being searched for, name only, if public."""
+    match_spec = MatchSpec(context._argparse_args.match_spec)
+    return _get_public_package_name(match_spec) or ""
 
 
 def get_install_arguments() -> tuple[str, ...]:
-    """Get the parsed position argument."""
-    return context._argparse_args.packages
+    """Get the requested package names, omitting any from a private channel."""
+    names = (_get_public_package_name(spec) for spec in requested_packages.specs)
+    return tuple(name for name in names if name is not None)
 
 
 @timer
@@ -318,10 +381,14 @@ def conda_pre_commands() -> Iterator[CondaPreCommand]:
 
 @hookimpl
 def conda_pre_solves() -> Iterator[CondaPreSolve]:
-    """Register capture_requested_packages() as a conda pre-solve hook."""
+    """Register the pre-solve hooks that capture the requested packages."""
     yield CondaPreSolve(
         name="conda-anaconda-telemetry-pre-solve",
         action=capture_requested_packages,
+    )
+    yield CondaPreSolve(
+        name="conda-anaconda-telemetry-pre-solve-specs",
+        action=capture_requested_specs,
     )
 
 
