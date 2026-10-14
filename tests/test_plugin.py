@@ -21,6 +21,7 @@ from conda.plugins.manager import CondaPluginManager
 import conda_anaconda_telemetry.hooks as hooks_module
 import conda_anaconda_telemetry.plugin as plugin_module
 from conda_anaconda_telemetry.hooks import (
+    capture_requested_specs,
     conda_exception_observers,
     conda_post_commands,
     conda_post_solves,
@@ -151,11 +152,13 @@ def test_conda_pre_commands_registration() -> None:
 
 
 def test_conda_pre_solves_registration() -> None:
-    """The hookimpl yields a single pre-solve hook."""
-    (pre_solve,) = conda_pre_solves()
+    """The hookimpl yields the pre-solve hooks."""
+    pre_solve, specs_pre_solve = conda_pre_solves()
 
     assert pre_solve.name == "conda-anaconda-telemetry-pre-solve"
     assert pre_solve.action is capture_requested_packages
+    assert specs_pre_solve.name == "conda-anaconda-telemetry-pre-solve-specs"
+    assert specs_pre_solve.action is capture_requested_specs
 
 
 def test_conda_post_commands_registration() -> None:

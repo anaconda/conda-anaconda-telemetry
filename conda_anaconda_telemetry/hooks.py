@@ -113,7 +113,7 @@ KNOWN_PUBLIC_CHANNEL_URLS = frozenset(
         "https://repo.anaconda.com/pkgs/main",
         "https://repo.anaconda.com/pkgs/msys2",
         "https://repo.anaconda.com/pkgs/r",
-        "https://repo.anaconda.cloud/main-x",
+        "https://repo.anaconda.cloud/repo/main-x",
     }
 )
 
@@ -131,8 +131,7 @@ def _get_public_package_name(spec: MatchSpec) -> str | None:
     """
     channel = spec.get("channel")
     if channel is None and spec.get("url") is not None:
-        # Direct URL/local-path specs have no channel to leak; name is "*".
-        return spec.name
+        return None
     channels = (
         (channel,) if channel is not None else tuple(map(Channel, context.channels))
     )

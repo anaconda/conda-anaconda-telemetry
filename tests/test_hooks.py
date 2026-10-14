@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from conda.base.context import context
-from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 
 from conda_anaconda_telemetry.hooks import (
@@ -18,6 +17,7 @@ from conda_anaconda_telemetry.hooks import (
     HEADER_SEARCH,
     HEADER_SYS_INFO,
     HEADER_VIRTUAL_PACKAGES,
+    KNOWN_PUBLIC_CHANNEL_URLS,
     REQUEST_HEADER_PATTERN,
     SIZE_LIMIT,
     _conda_request_headers,
@@ -194,7 +194,11 @@ def test_get_channel_urls_strips_credentials(
             "conda-forge::pkg_foo=1.2.3=py311h_0",
             "pkg_foo",
         ),  # strips version/build/channel
-        ("/local/path/to/pkg-1.0-0.tar.bz2", "*"),  # no raw local path leaked
+        ("/local/path/to/pkg-1.0-0.tar.bz2", ""),  # local path omitted
+        (  # named URL spec omitted
+            "private-package[url='https://private.example.invalid/private-package-1.0-0.tar.bz2']",
+            "",
+        ),
         ("somethingprivate::pkg_foo", ""),  # private channel name omitted
     ],
 )
@@ -219,7 +223,13 @@ def test_search_term_public_only(
             ["defaults::pkg_bar", "conda-forge::pkg_foo=1.2.3=py311h_0"],
             ("pkg_bar", "pkg_foo"),
         ),
-        (["/local/path/to/pkg-1.0-0.tar.bz2"], ("*",)),  # no raw local path leaked
+        (["/local/path/to/pkg-1.0-0.tar.bz2"], ()),  # local path omitted
+        (  # named URL spec omitted
+            [
+                "private-package[url='https://private.example.invalid/private-package-1.0-0.tar.bz2']"
+            ],
+            (),
+        ),
         (  # private channel name omitted, public ones kept
             ["defaults::pkg_bar", "somethingprivate::pkg_foo"],
             ("pkg_bar",),
@@ -277,19 +287,16 @@ def test_search_term_unqualified_spec_leaks_on_private_channel(
     assert get_search_term() == ""
 
 
-def test_main_x_host_mismatch_drops_name(
-    mocker: MockerFixture, monkeypatch: MonkeyPatch
+@pytest.mark.parametrize("channel_url", sorted(KNOWN_PUBLIC_CHANNEL_URLS))
+def test_known_public_channel_urls_keep_name(
+    monkeypatch: MonkeyPatch, channel_url: str
 ) -> None:
     """
-    A public channel name resolving to an unlisted host has its package
-    name omitted
+    Package names from every known public channel URL are kept
     """
-    mocker.patch(
-        "conda.base.context.Context.custom_channels",
-        new_callable=mocker.PropertyMock,
-        return_value={"main-x": Channel("https://repo.anaconda.cloud/repo/main-x")},
+    monkeypatch.setattr(
+        requested_packages, "specs", (MatchSpec(f"{channel_url}::pkg_foo"),)
     )
-    monkeypatch.setattr(requested_packages, "specs", (MatchSpec("main-x::pkg_foo"),))
 
     assert get_install_arguments() == ("pkg_foo",)
 
