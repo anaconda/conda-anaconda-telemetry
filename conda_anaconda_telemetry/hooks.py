@@ -11,10 +11,10 @@ import time
 import typing
 
 from conda.base.context import context
-from conda.cli.main_list import list_packages
 from conda.common.configuration import PrimitiveParameter
-from conda.common.url import mask_anaconda_token
-from conda.models.channel import all_channel_urls
+from conda.core.prefix_data import PrefixData
+from conda.models.channel import Channel, all_channel_urls
+from conda.models.match_spec import MatchSpec
 from conda.plugins import hookimpl
 from conda.plugins.types import (
     CondaExceptionObserver,
@@ -30,6 +30,7 @@ from conda_anaconda_telemetry.plugin import (
     capture_command,
     capture_requested_packages,
     capture_resolved_packages,
+    command_request,
     report_error,
     report_success,
 )
@@ -99,6 +100,47 @@ REQUEST_HEADER_PATTERN = re.compile(
 )
 
 
+# Resolve channel URLs before checking this list because channel names and
+# defaults can be redirected in conda configuration. Labels must not come from
+# Channel.canonical_name, which can contain a user-defined multichannel alias.
+KNOWN_PUBLIC_CHANNELS = {
+    "https://conda.anaconda.org/anaconda": "anaconda",
+    "https://conda.anaconda.org/conda-forge": "conda-forge",
+    "https://conda.anaconda.org/main": "main",
+    "https://conda.anaconda.org/msys2": "msys2",
+    "https://conda.anaconda.org/r": "r",
+    "https://repo.anaconda.com/pkgs/main": "defaults",
+    "https://repo.anaconda.com/pkgs/msys2": "defaults",
+    "https://repo.anaconda.com/pkgs/r": "defaults",
+    "https://repo.anaconda.cloud/repo/main-x": "main-x",
+}
+
+
+def is_public_channel(channel: Channel) -> bool:
+    """Return whether all resolved base URLs are explicitly public."""
+    return bool(channel.base_urls) and all(
+        url in KNOWN_PUBLIC_CHANNELS for url in channel.base_urls
+    )
+
+
+def get_public_package_name(spec: MatchSpec) -> str | None:
+    """Return a package name only when its possible channels are public."""
+    # Conda 26.5 can discard a channel URL's host or a local channel's path.
+    # Check the original input before trusting the parsed channel name.
+    original_spec = spec.original_spec_str or ""
+    if spec.get("url") is not None or any(
+        marker in original_spec for marker in ("/", "\\", "..", "~")
+    ):
+        return None
+    channel = spec.get("channel")
+    channels = (
+        (channel,) if channel is not None else tuple(map(Channel, context.channels))
+    )
+    if not channels or not all(is_public_channel(c) for c in channels):
+        return None
+    return spec.name
+
+
 def timer(func: Callable) -> Callable:
     """Log the duration of a function call."""
 
@@ -131,9 +173,12 @@ def get_virtual_packages() -> tuple[str, ...]:
 
 
 def get_channel_urls() -> tuple[str, ...]:
-    """Return a list of currently configured channel URLs with tokens masked."""
-    channels = list(all_channel_urls(context.channels, with_credentials=False))
-    return tuple(mask_anaconda_token(c) for c in channels)
+    """Return only configured URLs belonging to explicitly public channels."""
+    return tuple(
+        url
+        for url in all_channel_urls(context.channels, with_credentials=False)
+        if is_public_channel(Channel(url))
+    )
 
 
 def get_conda_command() -> str:
@@ -142,21 +187,33 @@ def get_conda_command() -> str:
 
 
 def get_package_list() -> tuple[str, ...]:
-    """Retrieve the list of packages in the current environment."""
+    """Return installed public packages without user-defined channel aliases."""
     prefix = context.active_prefix or context.root_prefix
-    _, packages = list_packages(prefix, format="canonical")
-
-    return packages
+    records = sorted(PrefixData(prefix).iter_records(), key=lambda record: record.name)
+    return tuple(
+        f"{KNOWN_PUBLIC_CHANNELS[record.channel.base_url]}/{record.subdir}::"
+        f"{record.name}-{record.version}-{record.build}"
+        for record in records
+        if record.channel.base_url in KNOWN_PUBLIC_CHANNELS
+    )
 
 
 def get_search_term() -> str:
-    """Retrieve the search term being used when search command is run."""
-    return context._argparse_args.match_spec
+    """Return only the public package name being searched for."""
+    return get_public_package_name(MatchSpec(context._argparse_args.match_spec)) or ""
 
 
 def get_install_arguments() -> tuple[str, ...]:
-    """Get the parsed position argument."""
-    return context._argparse_args.packages
+    """Return public package names captured by the pre-solve hook."""
+    # YAML channels are not included in context.channels. The pre-solve hook
+    # cannot identify the source of an unqualified spec from a file.
+    from_file = bool(getattr(context._argparse_args, "file", None))
+    names = (
+        get_public_package_name(spec)
+        for spec in command_request.requested_specs
+        if not from_file or spec.get("channel") is not None
+    )
+    return tuple(sorted({name for name in names if name is not None}))
 
 
 @timer
@@ -188,16 +245,15 @@ def get_virtual_packages_header_value() -> str:
 
 
 @timer
-@functools.lru_cache(None)
 def get_install_arguments_header_value() -> str:
-    """Return ``FIELD_SEPARATOR`` delimited string of channel URLs."""
+    """Return ``FIELD_SEPARATOR`` delimited public requested package names."""
     return FIELD_SEPARATOR.join(get_install_arguments())
 
 
 @timer
 @functools.lru_cache(None)
 def get_installed_packages_header_value() -> str:
-    """Return ``FIELD_SEPARATOR`` delimited string of install arguments."""
+    """Return ``FIELD_SEPARATOR`` delimited public installed packages."""
     return FIELD_SEPARATOR.join(get_package_list())
 
 

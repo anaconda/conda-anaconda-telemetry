@@ -196,6 +196,7 @@ def test_capture_command(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
     plugin_module.command_request.requested_names = ["stale"]
+    plugin_module.command_request.requested_specs = (MatchSpec("stale"),)
     plugin_module.command_request.channels = ["stale"]
     plugin_module.command_request.resolved_packages = ["stale=1=0"]
 
@@ -203,6 +204,7 @@ def test_capture_command(
 
     assert plugin_module.command_request.command == expected_command
     assert plugin_module.command_request.requested_names is None
+    assert plugin_module.command_request.requested_specs == ()
     assert plugin_module.command_request.resolved_packages is None
     if expected_command is None:
         assert plugin_module.command_request.channels is None
@@ -249,11 +251,13 @@ def test_capture_requested_packages(
     )
     plugin_module.command_request.command = captured_command
 
-    capture_requested_packages(
-        frozenset({MatchSpec("numpy"), MatchSpec("python >=3.11")}), frozenset()
-    )
+    specs = frozenset({MatchSpec("numpy"), MatchSpec("python >=3.11")})
+    capture_requested_packages(specs, frozenset())
 
     assert plugin_module.command_request.requested_names == expected_names
+    assert frozenset(plugin_module.command_request.requested_specs) == (
+        specs if expected_names is not None else frozenset()
+    )
 
 
 def test_capture_resolved_packages(mocker: MockerFixture) -> None:
@@ -289,6 +293,7 @@ def test_clear_command_resets_state() -> None:
     """clear_command() resets all captured state."""
     plugin_module.command_request.command = plugin_module.TelemetryCommand.INSTALL
     plugin_module.command_request.requested_names = ["numpy"]
+    plugin_module.command_request.requested_specs = (MatchSpec("numpy"),)
     plugin_module.command_request.channels = ["defaults"]
     plugin_module.command_request.resolved_packages = [RESOLVED_PACKAGE]
 
@@ -296,6 +301,7 @@ def test_clear_command_resets_state() -> None:
 
     assert plugin_module.command_request.command is None
     assert plugin_module.command_request.requested_names is None
+    assert plugin_module.command_request.requested_specs == ()
     assert plugin_module.command_request.channels is None
     assert plugin_module.command_request.resolved_packages is None
 

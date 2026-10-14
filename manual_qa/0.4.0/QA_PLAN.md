@@ -84,7 +84,7 @@ conda info
 # Confirm package versions.
 conda --version                                      # expected: 26.9.2
 conda list -n base conda-anaconda-telemetry          # expected: a canary version with a Git hash
-conda list -n base anaconda-opentelemetry            # expected: 1.2.4 or newer
+conda list -n base anaconda-opentelemetry            # expected: 1.2.5 or newer
 
 # Confirm that the plugin is registered and enabled.
 conda config --describe plugins.anaconda_telemetry   # expected: default value True
@@ -170,7 +170,7 @@ conda_anaconda_telemetry/otel.py                  # SDK configuration, event att
 conda_anaconda_telemetry/plugin.py                # Command state and success/PNFE reporting
 conda_anaconda_telemetry/resource_attributes.py   # conda.* and installer.* resource attributes
 conda_anaconda_telemetry/hooks.py                 # conda hook registration
-recipe/meta.yaml, pyproject.toml                  # anaconda-opentelemetry >=1.2.4 dependency
+recipe/meta.yaml, pyproject.toml                  # anaconda-opentelemetry >=1.2.5 dependency
 ```
 
 ### Modules/Components Affected
