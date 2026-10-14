@@ -125,7 +125,12 @@ def is_public_channel(channel: Channel) -> bool:
 
 def get_public_package_name(spec: MatchSpec) -> str | None:
     """Return a package name only when its possible channels are public."""
-    if spec.get("url") is not None:
+    # Conda 26.5 can discard a channel URL's host or a local channel's path.
+    # Check the original input before trusting the parsed channel name.
+    original_spec = spec.original_spec_str or ""
+    if spec.get("url") is not None or any(
+        marker in original_spec for marker in ("/", "\\", "..", "~")
+    ):
         return None
     channel = spec.get("channel")
     channels = (

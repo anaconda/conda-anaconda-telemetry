@@ -179,6 +179,15 @@ def test_private_data_absent_from_emitted_headers(
     [
         ("conda-forge::public-package=1.0=0", "public-package"),
         ("private-organization::private-package", ""),
+        ("https://private.example.test/conda-forge::private-package", ""),
+        ("private-package[channel=https://private.example.test/conda-forge]", ""),
+        ("./conda-forge::private-package", ""),
+        ("/synthetic-private/conda-forge::private-package", ""),
+        (r"C:\synthetic-private\conda-forge::private-package", ""),
+        ("file:///synthetic-private/conda-forge::private-package", ""),
+        ("https://conda.anaconda.org/conda-forge::public-package", ""),
+        ("public-package[channel=https://conda.anaconda.org/conda-forge]", ""),
+        ("conda-forge/linux-64::public-package", ""),
         ("https://private.example.test/private-package-1.0-0.conda", ""),
         ("/synthetic-private/private-package-1.0-0.tar.bz2", ""),
         (
@@ -206,6 +215,38 @@ def test_request_specs_are_filtered_in_emitted_headers(
 
     name = hooks.HEADER_SEARCH if command == "search" else hooks.HEADER_INSTALL
     assert headers[name] == expected
+    assert "private" not in " ".join(headers.values())
+
+
+@pytest.mark.parametrize("command", ["search", "install"])
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "..::private-package",
+        "private-package[channel=..]",
+        "~::private-package",
+        "private-package[channel=~]",
+    ],
+)
+def test_local_channel_shorthand_is_omitted(
+    mocker: MockerFixture, command: str, spec: str
+) -> None:
+    mocker.patch(
+        "conda.models.channel.path_to_url",
+        return_value="file:///synthetic-private/conda-forge",
+    )
+    mocker.patch.object(
+        hooks.context,
+        "_argparse_args",
+        SimpleNamespace(cmd=command, packages=[spec], match_spec=spec),
+    )
+    if command == "install":
+        capture_specs(spec)
+
+    headers = emitted_headers()
+
+    name = hooks.HEADER_SEARCH if command == "search" else hooks.HEADER_INSTALL
+    assert headers[name] == ""
     assert "private" not in " ".join(headers.values())
 
 
@@ -311,7 +352,7 @@ def test_main_x_uses_actual_public_url(
     header_context.return_value.iter_records.return_value = (
         package_record("public-package", main_x),
     )
-    capture_specs(f"{main_x}::public-package")
+    capture_specs("public-package")
 
     headers = emitted_headers()
 
