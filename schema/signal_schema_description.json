@@ -11,6 +11,12 @@
     },
     "create.success": {
       "description": "Sent when `conda create` succeeds. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the plugin has no record of the request or the result."
+    },
+    "remove.success": {
+    "description": "Sent when conda remove succeeds. Requested packages are taken from removal specs. Resolved packages are included when a post-solve result is available. It is not sent when telemetry is disabled or the request was not captured."
+    },
+    "update.success": {
+      "description": "Sent when conda update succeeds. Requested packages are taken from the public pre-solve specs. Resolved packages are included when a post-solve result is available. It is not sent when telemetry is disabled or the request was not captured."
     }
   },
   "resource": {
@@ -199,12 +205,24 @@
     "install.channel_priority": {
       "description": "The channel priority setting of conda.",
       "owner": "plugin",
-      "optional": false
+      "optional": false,
+      "events": [
+        "install.pnfe",
+        "create.pnfe",
+        "install.success",
+        "create.success"
+      ]
     },
     "install.channels": {
       "description": "Channels used for the request. Only `defaults`, `main`, `main-x` and `conda-forge` are sent by name. Any other channel is sent as `other`.",
       "owner": "plugin",
-      "optional": false
+      "optional": false,
+      "events": [
+        "install.pnfe",
+        "create.pnfe",
+        "install.success",
+        "create.success"
+      ]
     },
     "log.event.name": {
       "description": "Name of the event.",

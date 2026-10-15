@@ -31,7 +31,7 @@
   "events": {
     "install.pnfe": {
       "command": "install",
-      "event.schema_version": "1",
+      "event.schema_version": "2",
       "exception.missing_specs": [
         "<string>"
       ],
@@ -48,7 +48,7 @@
     },
     "create.pnfe": {
       "command": "create",
-      "event.schema_version": "1",
+      "event.schema_version": "2",
       "exception.missing_specs": [
         "<string>"
       ],
@@ -65,7 +65,7 @@
     },
     "install.success": {
       "command": "install",
-      "event.schema_version": "1",
+      "event.schema_version": "2",
       "install.channel_priority": "<string>",
       "install.channels": [
         "<string>"
@@ -81,7 +81,7 @@
     },
     "create.success": {
       "command": "create",
-      "event.schema_version": "1",
+      "event.schema_version": "2",
       "install.channel_priority": "<string>",
       "install.channels": [
         "<string>"

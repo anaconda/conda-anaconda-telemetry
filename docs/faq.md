@@ -63,7 +63,7 @@ Data handled via OTel are sent to Anaconda's servers.
 <!-- BEGIN GENERATED OTEL SIGNAL -->
 ### Signal version
 
-The signal version is `1`. It is sent as `event.schema_version`, which the plugin sets. It is separate from `schema.version`, which the SDK sets.
+The signal version is `2`. It is sent as `event.schema_version`, which the plugin sets. It is separate from `schema.version`, which the SDK sets.
 
 ### Events
 
@@ -71,6 +71,8 @@ The signal version is `1`. It is sent as `event.schema_version`, which the plugi
 - `create.pnfe`: Sent when `conda create` fails because a requested package is not in the configured channels. It is not sent when telemetry is disabled, when the plugin has no record of the request, or when a package name cannot be read (for example, a URL spec).
 - `install.success`: Sent when `conda install` succeeds. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the plugin has no record of the request or the result.
 - `create.success`: Sent when `conda create` succeeds. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the plugin has no record of the request or the result.
+- `remove.success`: Sent when conda remove succeeds. Requested packages are taken from removal specs. Resolved packages are included when a post-solve result is available. It is not sent when telemetry is disabled or the request was not captured.
+- `update.success`: Sent when conda update succeeds. Requested packages are taken from the public pre-solve specs. Resolved packages are included when a post-solve result is available. It is not sent when telemetry is disabled or the request was not captured.
 
 ### Resource attributes
 
@@ -128,7 +130,7 @@ Events: `install.pnfe`, `create.pnfe`.
 
 ### Log attributes: `success` outcome
 
-Events: `install.success`, `create.success`.
+Events: `install.success`, `create.success`, `remove.success`, `update.success`.
 
 | Name | Description | Owner | Presence |
 | --- | --- | --- | --- |
