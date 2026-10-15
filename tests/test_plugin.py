@@ -409,6 +409,38 @@ def test_remove_ignores_specs_to_add(mocker: MockerFixture) -> None:
     assert plugin_module.command_request.requested_names == ["zstd"]
 
 
+def test_remove_missing_package_reports_error(
+    plugin_manager: CondaPluginManagerType,
+    mocker: MockerFixture,
+    mock_install_attributes: dict,
+) -> None:
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry",
+        True,
+    )
+    plugin_manager.invoke_pre_commands("remove")
+    plugin_manager.invoke_pre_solves(
+        frozenset(),
+        frozenset({MatchSpec("zstd")}),
+    )
+
+    telemetry = mocker.MagicMock()
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.AnacondaTelemetry",
+        return_value=telemetry,
+    )
+
+    raise_and_dispatch(
+        plugin_manager,
+        PackagesNotFoundInPrefixError(["zstd"], "/tmp/test-env"),
+    )
+
+    telemetry.send_event.assert_called_once_with(
+        "remove.pnfe", "", mock_install_attributes
+    )
+    assert plugin_module.command_request.command is None
+
+
 def test_report_error_disabled_plugin(
     plugin_manager: CondaPluginManagerType, mocker: MockerFixture
 ) -> None:

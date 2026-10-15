@@ -78,12 +78,15 @@ def _get_error_signal_attributes() -> dict[str, object]:
 
 def _get_success_signal_attributes() -> dict[str, object]:
     """install.success's event attributes, built from a fabricated result."""
-    return get_success_attributes(
+    attributes = get_success_attributes(
         command="install",
         channels=["defaults"],
         requested_names=["numpy"],
         resolved_packages=["numpy=1.26.4=py311h1234567_0"],
     )
+    if attributes is None:
+        raise RuntimeError("get_success_attributes returned None")
+    return attributes
 
 
 def _build_signals() -> tuple[dict[str, object], dict[str, object]]:

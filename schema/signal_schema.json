@@ -94,6 +94,22 @@
         "<string>"
       ],
       "truncated": false
+    },
+    "remove.success": {
+      "command": "remove",
+      "event.schema_version": "2",
+      "log.event.name": "remove.success",
+      "requested.packages": ["<string>"],
+      "resolved.packages": ["<string>"],
+      "truncated": false
+    },
+    "update.success": {
+      "command": "update",
+      "event.schema_version": "2",
+      "log.event.name": "update.success",
+      "requested.packages": ["<string>"],
+      "resolved.packages": ["<string>"],
+      "truncated": false
     }
   }
 }
