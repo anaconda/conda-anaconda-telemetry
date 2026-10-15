@@ -331,7 +331,8 @@ def get_success_attributes(
     )
     resolved, resolved_truncated = _truncate(resolved_packages) 
 
-    if command in ("install", "create"):
-        # Only these commands have a resolved package list.
-        attributes["resolved.packages"] = resolved
-        attributes["truncated"] = truncated or resolved_truncated
+    return {
+        **attributes,
+        "resolved.packages": resolved,
+        "truncated": truncated or resolved_truncated,
+    }
