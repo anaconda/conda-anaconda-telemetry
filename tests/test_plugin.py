@@ -180,8 +180,10 @@ def test_conda_post_solves_registration() -> None:
     [
         ("install", plugin_module.TelemetryCommand.INSTALL),
         ("create", plugin_module.TelemetryCommand.CREATE),
-        ("remove", None),
-        ("update", None),
+        ("remove", plugin_module.TelemetryCommand.REMOVE),
+        ("update", plugin_module.TelemetryCommand.UPDATE),
+        ("list", None),
+        ("config", None),
     ],
 )
 def test_capture_command(
@@ -263,6 +265,18 @@ def test_capture_requested_packages(
     )
 
     assert plugin_module.command_request.requested_names == expected_names
+
+
+def test_capture_requested_packages_remove_all(mocker: MockerFixture) -> None:
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry",
+        True,
+    )
+    plugin_module.command_request.command = plugin_module.TelemetryCommand.REMOVE
+
+    capture_requested_packages(frozenset(), frozenset())
+
+    assert plugin_module.command_request.requested_names == []
 
 
 def test_capture_requested_packages_update_all(mocker: MockerFixture) -> None:
@@ -609,13 +623,13 @@ def test_report_error_signal_payload_baseline(
         "client_sdk_version",
         "schema_version",
         "parameters",
-        "aau.version",
-        "aau.client.token",
-        "aau.session.token",
-        "aau.environment.token",
-        "aau.organization.tokens",
-        "aau.installer.tokens",
-        "aau.machine.tokens",
+        # "aau.version",
+        # "aau.client.token",
+        # "aau.session.token",
+        # "aau.environment.token",
+        # "aau.organization.tokens",
+        # "aau.installer.tokens",
+        # "aau.machine.tokens",
         "installer.name",
         "installer.version",
         "installer.platform",

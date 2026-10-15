@@ -73,12 +73,18 @@ def capture_command(command: str) -> None:
 
 
 def capture_requested_packages(
-    specs_to_add: frozenset[MatchSpec], _specs_to_remove: frozenset[MatchSpec]
+    specs_to_add: frozenset[MatchSpec],
+    specs_to_remove: frozenset[MatchSpec],
 ) -> None:
     """Pre-solve hook to extract and save requested package names from specs."""
     if context.plugins.anaconda_telemetry and command_request.command is not None:
-        command_request.requested_names = package_names(list(specs_to_add))
-
+        specs = (
+            specs_to_remove
+            if command_request.command == TelemetryCommand.REMOVE
+            else specs_to_add
+        )
+        command_request.requested_names = package_names(list(specs))
+        
 
 def capture_resolved_packages(
     _repodata_fn: str,
