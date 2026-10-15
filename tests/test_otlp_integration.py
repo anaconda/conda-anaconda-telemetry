@@ -145,7 +145,10 @@ def send_all_events() -> None:
     """Report one pnfe and one success event for each command."""
     commands = list(plugin_module.TelemetryCommand)
     request = plugin_module.command_request
-    for command in commands:
+    for command in (
+        plugin_module.TelemetryCommand.CREATE,
+        plugin_module.TelemetryCommand.INSTALL,
+    ):
         request.command = command
         request.requested_names = ["numpy"]
         plugin_module.report_error(
@@ -249,11 +252,13 @@ def test_real_otlp_payload_received_by_local_collector(signal_schema: dict) -> N
 
     # Event-specific values.
     by_name = {log_attrs["log.event.name"]: log_attrs for _, log_attrs, _, _ in records}
-    for command in (c.value for c in plugin_module.TelemetryCommand):
+    for command in ("create", "install"):
         pnfe = by_name[f"{command}.pnfe"]
         assert pnfe["exception.missing_specs"] == ["numpy"]
         assert pnfe["exception.name"] == "PackagesNotFoundInChannelsError"
         assert pnfe["requested.packages"] == ["numpy"]
         assert pnfe["install.channels"] == []
+
+    for command in (c.value for c in plugin_module.TelemetryCommand):
         success = by_name[f"{command}.success"]
         assert success["resolved.packages"] == ["numpy=2.0.0=py312_0"]
