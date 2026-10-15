@@ -44,6 +44,7 @@ def test_log_keys_match_outcomes(signal_schema: dict, signal_description: dict) 
             key
             for key, meta in log.items()
             if outcome in meta.get("outcomes", OUTCOMES)
+            and event_name in meta.get("events", signal_schema["events"].keys())
         }
         assert set(attributes) == expected, event_name
     used = {
@@ -82,6 +83,9 @@ def test_metadata_rules(signal_description: dict) -> None:
     for name, meta in signal_description["log"].items():
         assert "token_class" not in meta, name
 
+    if "events" in meta:
+        assert set(meta["events"]) <= set(signal_description["events"]), name
+
 
 def test_optional_resource_attributes(signal_description: dict) -> None:
     """Only installer.*, aau.* and service.instance.id attributes are optional."""
@@ -115,7 +119,11 @@ def test_commands_match(signal_schema: dict) -> None:
     assert {name.split(".")[0] for name in events} == {
         c.value for c in TelemetryCommand
     }
-    assert events == {f"{c.value}.{o}" for c in TelemetryCommand for o in OUTCOMES}
+    assert events == {
+        *(f"{c.value}.success" for c in TelemetryCommand),
+        "create.pnfe",
+        "install.pnfe",
+    }
 
 
 def test_sample_values_are_safe(signal_schema: dict) -> None:
