@@ -321,15 +321,15 @@ def get_install_attributes(
 def get_success_attributes(
     *,
     command: str,
-    channels: list[str],
-    requested_names: list[str],
-    resolved_packages: dict[str, list[str]],
-) -> dict[str, Any]:
+    channels: list[str] | None = None,
+    requested_names: list[str] | None = None,
+    resolved_packages: dict[str, list[str]] | None = None,
+) -> dict[str, Any] | None:
     """Build attributes for a success signal."""
     attributes, truncated = _get_command_attributes(
         command=command, channels=channels, requested_names=requested_names
     )
-    resolved, resolved_truncated = _truncate(resolved_packages) 
+    resolved, resolved_truncated = _truncate(resolved_packages)
 
     return {
         **attributes,
