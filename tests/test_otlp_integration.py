@@ -205,7 +205,7 @@ def test_real_otlp_payload_received_by_local_collector(signal_schema: dict) -> N
     assert {path for _, path, _ in OTLPLogsReceiver.received} == {"/v1/logs"}
     assert {ct for _, _, ct in OTLPLogsReceiver.received} == {"application/x-protobuf"}
     records = received_records()
-    assert len(records) == 4
+    assert len(records) == len(signal_schema["events"])
 
     if os.environ.get("UPDATE_SIGNAL_SCHEMA") == "2":
         observed_keys = {"resource": list(records[0][0])}
