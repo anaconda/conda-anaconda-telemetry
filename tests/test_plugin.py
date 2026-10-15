@@ -147,7 +147,7 @@ def test_conda_pre_commands_registration() -> None:
 
     assert pre_command.name == "conda-anaconda-telemetry-pre-command"
     assert pre_command.action is capture_command
-    assert pre_command.run_for == {"create", "install"}
+    assert pre_command.run_for == {"create", "install", "remove", "update"}
 
 
 def test_conda_pre_solves_registration() -> None:
@@ -164,7 +164,7 @@ def test_conda_post_commands_registration() -> None:
 
     assert post_command.name == "conda-anaconda-telemetry-post-command"
     assert post_command.action is report_success
-    assert post_command.run_for == {"create", "install"}
+    assert post_command.run_for == {"create", "install", "remove", "update"}
 
 
 def test_conda_post_solves_registration() -> None:
@@ -204,7 +204,15 @@ def test_capture_command(
     capture_command(command)
 
     assert plugin_module.command_request.command == expected_command
-    assert plugin_module.command_request.requested_names is None
+    assert plugin_module.command_request.requested_names == (
+        []
+        if expected_command
+        in {
+            plugin_module.TelemetryCommand.REMOVE,
+            plugin_module.TelemetryCommand.UPDATE,
+        }
+        else None
+    )
     assert plugin_module.command_request.resolved_packages is None
     if expected_command is None:
         assert plugin_module.command_request.channels is None
@@ -279,12 +287,11 @@ def test_capture_requested_packages_remove_all(mocker: MockerFixture) -> None:
     assert plugin_module.command_request.requested_names == []
 
 
-def test_capture_requested_packages_update_all(mocker: MockerFixture) -> None:
+def test_capture_requested_packages_update_empty_specs(mocker: MockerFixture) -> None:
     mocker.patch(
         "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry", True
     )
     plugin_module.command_request.command = plugin_module.TelemetryCommand.UPDATE
-    plugin_module.command_request.update_all = True
 
     capture_requested_packages(frozenset(), frozenset())
 
@@ -374,6 +381,32 @@ def test_non_reportable_exception_clears_request(
     telemetry_cls.assert_not_called()
     assert plugin_module.command_request.command is None
     assert plugin_module.command_request.requested_names is None
+
+
+def test_remove_ignores_specs_to_add(mocker: MockerFixture) -> None:
+    """The remove command only captures specs_to_remove, not specs_to_add."""
+    mocker.patch(
+        "conda_anaconda_telemetry.plugin.context.plugins.anaconda_telemetry",
+        True,
+    )
+
+    capture_request(plugin_manager, "remove", ["python"])
+
+    capture_requested_packages(
+        frozenset(
+            {
+                MatchSpec("numpy"),
+                MatchSpec("python"),
+            }
+        ),
+        frozenset(
+            {
+                MatchSpec("zstd"),
+            }
+        ),
+    )
+
+    assert plugin_module.command_request.requested_names == ["zstd"]
 
 
 def test_report_error_disabled_plugin(

@@ -323,14 +323,39 @@ def get_success_attributes(
     command: str,
     channels: list[str] | None = None,
     requested_names: list[str] | None = None,
-    resolved_packages: dict[str, list[str]] | None = None,
+    resolved_packages: list[str] | None = None,
 ) -> dict[str, Any] | None:
-    """Build attributes for a success signal."""
-    attributes, truncated = _get_command_attributes(
-        command=command, channels=channels, requested_names=requested_names
-    )
-    resolved, resolved_truncated = _truncate(resolved_packages)
+    """Build attributes for a successful supported command."""
+    if command not in {"create", "install", "remove", "update"}:
+        return None
 
+    if requested_names is None:
+        return None
+
+    if command in {"create", "install"}:
+        if channels is None or resolved_packages is None:
+            return None
+
+        attributes, truncated = _get_command_attributes(
+            command=command,
+            channels=channels,
+            requested_names=requested_names,
+        )
+    else:
+        packages, truncated = _truncate(requested_names)
+        attributes = {
+            "command": command,
+            "event.schema_version": SIGNAL_VERSION,
+            "requested.packages": packages,
+        }
+
+    if resolved_packages is None:
+        return {
+            **attributes,
+            "truncated": truncated,
+        }
+
+    resolved, resolved_truncated = _truncate(resolved_packages)
     return {
         **attributes,
         "resolved.packages": resolved,

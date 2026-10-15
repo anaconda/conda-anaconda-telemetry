@@ -136,6 +136,9 @@ def report_error(event: CondaExceptionEvent) -> None:
         requested_names = command_request.requested_names
         if command is None or requested_names is None:
             return
+
+        if command not in {TelemetryCommand.CREATE, TelemetryCommand.INSTALL}:
+            return
         # Guard again even though the observer is only registered for this
         # class, in case of a name collision in `watch_for`.
         if not isinstance(event.exc_value, PackagesNotFoundInChannelsError):

@@ -447,6 +447,7 @@ def test_get_success_attributes_truncated_resolved_packages(
 
     # Byte limit (not item limit) is what trips first for these longer,
     # version-qualified package strings - see LIST_BYTE_LIMIT.
+    assert attributes is not None
     assert len(attributes["resolved.packages"]) < LIST_ITEM_LIMIT
     assert attributes["truncated"] is True
 
@@ -541,6 +542,25 @@ def test_auth_token_env_vars_are_neutralized(
     assert config._get_auth_token_logging() is None
 
 
+@pytest.mark.parametrize("command", ["remove", "update"])
+def test_non_install_success_attributes(
+    command: str,
+) -> None:
+    attributes = get_success_attributes(
+        command=command,
+        requested_names=["zstd"],
+        resolved_packages=["zstandard=0.25.0=py313_0"],
+    )
+
+    assert attributes == {
+        "command": command,
+        "event.schema_version": "2",
+        "requested.packages": ["zstd"],
+        "resolved.packages": ["zstandard=0.25.0=py313_0"],
+        "truncated": False,
+    }
+
+
 @pytest.mark.parametrize(
     "env_var", ["OTEL_EXPORTER_OTLP_HEADERS", "OTEL_EXPORTER_OTLP_LOGS_HEADERS"]
 )
@@ -629,6 +649,21 @@ def test_proxy_url_comes_from_conda_not_atel_proxy_url(
     assert config._get_proxy_url() == expected_proxy_url
 
 
+def test_remove_without_post_solve() -> None:
+    attributes = get_success_attributes(
+        command="remove",
+        requested_names=[],
+        resolved_packages=None,
+    )
+
+    assert attributes == {
+        "command": "remove",
+        "event.schema_version": "2",
+        "requested.packages": [],
+        "truncated": False,
+    }
+
+
 def test_shutdown_before_time_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -652,3 +687,30 @@ def test_shutdown_before_time_limit(
 
     assert done.is_set(), "shutdown() did not return in time"
     assert elapsed < _SHUTDOWN_TIMEOUT_SECONDS + 1.0
+
+
+@pytest.mark.parametrize("command", ["create", "install"])
+def test_success_attributes_with_empty_resolved_packages(
+    mocker: MockerFixture, command: str
+) -> None:
+    mocker.patch(
+        "conda_anaconda_telemetry.otel.context",
+        mocker.MagicMock(channel_priority="strict"),
+    )
+
+    attributes = get_success_attributes(
+        command=command,
+        channels=[],
+        requested_names=[],
+        resolved_packages=[],
+    )
+
+    assert attributes == {
+        "command": command,
+        "event.schema_version": "2",
+        "install.channels": [],
+        "install.channel_priority": "strict",
+        "requested.packages": [],
+        "resolved.packages": [],
+        "truncated": False,
+    }
