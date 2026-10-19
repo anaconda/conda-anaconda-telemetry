@@ -210,7 +210,7 @@ def test_real_otlp_payload_received_by_local_collector(signal_schema: dict) -> N
     records = received_records()
     assert len(records) == len(signal_schema["events"])
 
-    if os.environ.get("UPDATE_SIGNAL_SCHEMA") == "2":
+    if os.environ.get("UPDATE_SIGNAL_SCHEMA") == "1":
         observed_keys = {"resource": list(records[0][0])}
         for _, log_attrs, _, _ in records:
             observed_keys[str(log_attrs["log.event.name"])] = list(log_attrs)
