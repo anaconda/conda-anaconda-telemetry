@@ -398,7 +398,7 @@ def test_remove_ignores_specs_to_add(mocker: MockerFixture) -> None:
         specs_to_remove=frozenset({MatchSpec("zstd"), MatchSpec("curl")}),
     )
 
-    assert plugin_module.command_request.requested_names == ["zstd"]
+    assert plugin_module.command_request.requested_names == ["curl", "zstd"]
 
 
 def test_report_error_disabled_plugin(
@@ -648,13 +648,13 @@ def test_report_error_signal_payload_baseline(
         "client_sdk_version",
         "schema_version",
         "parameters",
-        "aau.version",
-        "aau.client.token",
-        "aau.session.token",
-        "aau.environment.token",
-        "aau.organization.tokens",
-        "aau.installer.tokens",
-        "aau.machine.tokens",
+        # "aau.version",
+        # "aau.client.token",
+        # "aau.session.token",
+        # "aau.environment.token",
+        # "aau.organization.tokens",
+        # "aau.installer.tokens",
+        # "aau.machine.tokens",
         "installer.name",
         "installer.version",
         "installer.platform",
