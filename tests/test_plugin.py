@@ -391,19 +391,11 @@ def test_remove_ignores_specs_to_add(mocker: MockerFixture) -> None:
     )
 
     capture_command("remove")
+    assert plugin_module.command_request.requested_names == []
 
     capture_requested_packages(
-        frozenset(
-            {
-                MatchSpec("numpy"),
-                MatchSpec("python"),
-            }
-        ),
-        frozenset(
-            {
-                MatchSpec("zstd"),
-            }
-        ),
+        specs_to_add=frozenset({MatchSpec("numpy"), MatchSpec("python")}),
+        specs_to_remove=frozenset({MatchSpec("zstd"), MatchSpec("curl")}),
     )
 
     assert plugin_module.command_request.requested_names == ["zstd"]
