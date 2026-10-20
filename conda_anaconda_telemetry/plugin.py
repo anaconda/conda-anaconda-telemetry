@@ -136,10 +136,15 @@ def report_error(event: CondaExceptionEvent) -> None:
         requested_names = command_request.requested_names
 
         # Only create/install report package-not-found errors.
-        if command is None or requested_names is None or command not in {
-            TelemetryCommand.CREATE,
-            TelemetryCommand.INSTALL,
-        }:
+        if (
+            command is None
+            or requested_names is None
+            or command
+            not in {
+                TelemetryCommand.CREATE,
+                TelemetryCommand.INSTALL,
+            }
+        ):
             return
 
         # Guard again even though the observer is only registered for this
