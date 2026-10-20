@@ -29,23 +29,6 @@
     "telemetry.sdk.version": "<string>"
   },
   "events": {
-    "install.pnfe": {
-      "command": "install",
-      "event.schema_version": "2",
-      "exception.missing_specs": [
-        "<string>"
-      ],
-      "exception.name": "<string>",
-      "install.channel_priority": "<string>",
-      "install.channels": [
-        "<string>"
-      ],
-      "log.event.name": "install.pnfe",
-      "requested.packages": [
-        "<string>"
-      ],
-      "truncated": false
-    },
     "create.pnfe": {
       "command": "create",
       "event.schema_version": "2",
@@ -58,6 +41,39 @@
         "<string>"
       ],
       "log.event.name": "create.pnfe",
+      "requested.packages": [
+        "<string>"
+      ],
+      "truncated": false
+    },
+    "create.success": {
+      "command": "create",
+      "event.schema_version": "2",
+      "install.channel_priority": "<string>",
+      "install.channels": [
+        "<string>"
+      ],
+      "log.event.name": "create.success",
+      "requested.packages": [
+        "<string>"
+      ],
+      "resolved.packages": [
+        "<string>"
+      ],
+      "truncated": false
+    },
+    "install.pnfe": {
+      "command": "install",
+      "event.schema_version": "2",
+      "exception.missing_specs": [
+        "<string>"
+      ],
+      "exception.name": "<string>",
+      "install.channel_priority": "<string>",
+      "install.channels": [
+        "<string>"
+      ],
+      "log.event.name": "install.pnfe",
       "requested.packages": [
         "<string>"
       ],
@@ -79,37 +95,38 @@
       ],
       "truncated": false
     },
-    "create.success": {
-      "command": "create",
+    "remove.success": {
+      "command": "remove",
       "event.schema_version": "2",
-      "install.channel_priority": "<string>",
-      "install.channels": [
-        "<string>"
-      ],
-      "log.event.name": "create.success",
+      "log.event.name": "remove.success",
       "requested.packages": [
         "<string>"
       ],
       "resolved.packages": [
         "<string>"
       ],
-      "truncated": false
-    },
-    "remove.success": {
-      "command": "remove",
-      "event.schema_version": "2",
-      "log.event.name": "remove.success",
-      "requested.packages": ["<string>"],
-      "resolved.packages": ["<string>"],
-      "truncated": false
+      "truncated": false,
+      "install.channels": [
+        "<string>"
+      ],
+      "install.channel_priority": "<string>"
     },
     "update.success": {
       "command": "update",
       "event.schema_version": "2",
       "log.event.name": "update.success",
-      "requested.packages": ["<string>"],
-      "resolved.packages": ["<string>"],
-      "truncated": false
+      "requested.packages": [
+        "<string>"
+      ],
+      "resolved.packages": [
+        "<string>"
+      ],
+      "truncated": false,
+      "install.channels": [
+        "<string>"
+      ],
+      "install.channel_priority": "<string>",
+      "update.all": false
     }
   }
 }

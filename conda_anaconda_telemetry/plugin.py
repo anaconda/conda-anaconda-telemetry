@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from conda.base.constants import UpdateModifier
 from conda.base.context import context
 from conda.exceptions import PackagesNotFoundInChannelsError
 
@@ -51,6 +52,7 @@ class CommandRequest:
     requested_names: list[str] | None = None
     channels: list[str] | None = None
     resolved_packages: list[str] | None = None
+    update_all: bool = False
 
 
 command_request = CommandRequest()
@@ -58,19 +60,25 @@ command_request = CommandRequest()
 
 def capture_command(command: str) -> None:
     """Pre-command hook to record the active command and reset old state."""
-    command_request.requested_names = None
-    command_request.channels = None
-    command_request.resolved_packages = None
+    clear_command()
+
     if not context.plugins.anaconda_telemetry:
         return
     try:
         command_request.command = TelemetryCommand(command)
+
+        command_request.update_all = (
+            command_request.command == TelemetryCommand.UPDATE
+            and context.update_modifier == UpdateModifier.UPDATE_ALL
+        )
+
         # Success events use configured channels because no exception provides them.
         if command_request.command in {
             TelemetryCommand.REMOVE,
             TelemetryCommand.UPDATE,
         }:
             command_request.requested_names = []
+            command_request.resolved_packages = []
 
         command_request.channels = list(context.channels)
     except ValueError:
@@ -87,6 +95,11 @@ def capture_requested_packages(
 
     command = command_request.command
     if command is None:
+        return
+
+    if command == TelemetryCommand.UPDATE and command_request.update_all:
+        # No individual pkgs requested by the user
+        command_request.requested_names = []
         return
 
     if command == TelemetryCommand.REMOVE:
@@ -124,6 +137,7 @@ def clear_command() -> None:
     command_request.requested_names = None
     command_request.channels = None
     command_request.resolved_packages = None
+    command_request.update_all = False
 
 
 # Generic error reporting function which can be expanded to track any error, as needed.
@@ -197,11 +211,15 @@ def report_success(command: str) -> None:
         if request.command.value != command:
             return
 
-        # Skip success telemetry when no post-solve result was captured.
-        if request.command in {
-            TelemetryCommand.CREATE,
-            TelemetryCommand.INSTALL,
-        } and (request.resolved_packages is None or request.channels is None):
+        # Create/install requre a post-solve result.
+        if (
+            request.command
+            in {
+                TelemetryCommand.CREATE,
+                TelemetryCommand.INSTALL,
+            }
+            and request.resolved_packages is None
+        ):
             return
 
         try:
@@ -210,6 +228,7 @@ def report_success(command: str) -> None:
                 channels=request.channels,
                 requested_names=request.requested_names,
                 resolved_packages=request.resolved_packages,
+                update_all=request.update_all,
             )
         except Exception as e:
             logger.debug(

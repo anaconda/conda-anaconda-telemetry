@@ -324,30 +324,23 @@ def get_success_attributes(
     channels: list[str] | None = None,
     requested_names: list[str] | None = None,
     resolved_packages: list[str] | None = None,
+    update_all: bool = False,
 ) -> dict[str, Any] | None:
     """Build attributes for a successful supported command."""
     if command not in {"create", "install", "remove", "update"}:
         return None
 
-    if requested_names is None:
+    if requested_names is None or channels is None or resolved_packages is None:
         return None
 
-    if command in {"create", "install"}:
-        if channels is None or resolved_packages is None:
-            return None
+    attributes, truncated = _get_command_attributes(
+        command=command,
+        channels=channels,
+        requested_names=requested_names,
+    )
 
-        attributes, truncated = _get_command_attributes(
-            command=command,
-            channels=channels,
-            requested_names=requested_names,
-        )
-    else:
-        packages, truncated = _truncate(requested_names)
-        attributes = {
-            "command": command,
-            "event.schema_version": SIGNAL_VERSION,
-            "requested.packages": packages,
-        }
+    if command == "update":
+        attributes["update.all"] = update_all
 
     if resolved_packages is None:
         return {

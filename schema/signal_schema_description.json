@@ -207,10 +207,12 @@
       "owner": "plugin",
       "optional": false,
       "events": [
-        "install.pnfe",
         "create.pnfe",
+        "create.success",
+        "install.pnfe",
         "install.success",
-        "create.success"
+        "remove.success",
+        "update.success"
       ]
     },
     "install.channels": {
@@ -218,10 +220,12 @@
       "owner": "plugin",
       "optional": false,
       "events": [
-        "install.pnfe",
         "create.pnfe",
+        "create.success",
+        "install.pnfe",
         "install.success",
-        "create.success"
+        "remove.success",
+        "update.success"
       ]
     },
     "log.event.name": {
@@ -235,7 +239,7 @@
       "optional": false
     },
     "resolved.packages": {
-      "description": "Packages that the solver chose to install.",
+      "description": "Packages that the solver chose to install, or an empty list for remove/update.",
       "owner": "plugin",
       "optional": false,
       "outcomes": [
@@ -246,6 +250,14 @@
       "description": "Whether the plugin shortened a list to keep the signal small.",
       "owner": "plugin",
       "optional": false
+    },
+    "update.all": {
+      "description": "Whether the user requested updating all packages instead of specifying individual packages.",
+      "owner": "plugin",
+      "optional": false,
+      "events": [
+        "update.success"
+      ]
     }
   }
 }

@@ -127,6 +127,7 @@ Events: `install.pnfe`, `create.pnfe`.
 | `log.event.name` | Name of the event. | sdk | always |
 | `requested.packages` | Names of the packages that the user requested. Only package names are sent, with no versions or URLs. | plugin | always |
 | `truncated` | Whether the plugin shortened a list to keep the signal small. | plugin | always |
+| `update.all` | Whether the user requested updating all packages instead of specifying individual packages. | plugin | always |
 
 ### Log attributes: `success` outcome
 
@@ -140,6 +141,7 @@ Events: `install.success`, `create.success`, `remove.success`, `update.success`.
 | `install.channels` | Channels used for the request. Only `defaults`, `main`, `main-x` and `conda-forge` are sent by name. Any other channel is sent as `other`. | plugin | always |
 | `log.event.name` | Name of the event. | sdk | always |
 | `requested.packages` | Names of the packages that the user requested. Only package names are sent, with no versions or URLs. | plugin | always |
-| `resolved.packages` | Packages that the solver chose to install. | plugin | always |
+| `resolved.packages` | Packages that the solver chose to install, or an empty list for remove/update. | plugin | always |
 | `truncated` | Whether the plugin shortened a list to keep the signal small. | plugin | always |
+| `update.all` | Whether the user requested updating all packages instead of specifying individual packages. | plugin | always |
 <!-- END GENERATED OTEL SIGNAL -->
