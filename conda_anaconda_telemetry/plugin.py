@@ -134,11 +134,14 @@ def report_error(event: CondaExceptionEvent) -> None:
             return
         command = command_request.command
         requested_names = command_request.requested_names
-        if command is None or requested_names is None:
+
+        # Only create/install report package-not-found errors.
+        if command is None or requested_names is None or command not in {
+            TelemetryCommand.CREATE,
+            TelemetryCommand.INSTALL,
+        }:
             return
 
-        if command not in {TelemetryCommand.CREATE, TelemetryCommand.INSTALL}:
-            return
         # Guard again even though the observer is only registered for this
         # class, in case of a name collision in `watch_for`.
         if not isinstance(event.exc_value, PackagesNotFoundInChannelsError):
@@ -178,7 +181,12 @@ def report_success(command: str) -> None:
         if context.dry_run or context.download_only:
             return
         request = command_request
-        if request.command is None or request.requested_names is None:
+        if (
+            request.command is None
+            or request.requested_names is None
+            or request.channels is None
+            or request.resolved_packages is None
+        ):
             return
 
         if request.command.value != command:
