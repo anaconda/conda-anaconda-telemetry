@@ -13,10 +13,10 @@
       "description": "Sent when `conda create` succeeds. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the plugin has no record of the request or the result."
     },
     "remove.success": {
-      "description": "Sent when `conda remove` succeeds. Requested packages are taken from removal specs. Resolved packages are included when a post-solve result is available. It is not sent when telemetry is disabled or the request was not captured."
+      "description": "Sent when `conda remove` succeeds. Requested packages are taken from removal specs. Resolved packages may be empty when no packages are linked. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the request was not captured."
     },
     "update.success": {
-      "description": "Sent when `conda update` succeeds. Requested packages are taken from the public pre-solve specs. Resolved packages are included when a post-solve result is available. It is not sent when telemetry is disabled or the request was not captured."
+      "description": "Sent when `conda update` succeeds. Requested packages are taken from the public pre-solve specs. Resolved packages may be empty when no packages are linked. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the request was not captured."
     }
   },
   "resource": {
@@ -255,6 +255,9 @@
       "description": "Whether the user requested updating all packages instead of specifying individual packages.",
       "owner": "plugin",
       "optional": false,
+      "outcomes": [
+        "success"
+      ],
       "events": [
         "update.success"
       ]

@@ -126,7 +126,7 @@
         "<string>"
       ],
       "install.channel_priority": "<string>",
-      "update.all": false
+      "update.all": true
     }
   }
 }

@@ -83,8 +83,8 @@ def test_metadata_rules(signal_description: dict) -> None:
     for name, meta in signal_description["log"].items():
         assert "token_class" not in meta, name
 
-    if "events" in meta:
-        assert set(meta["events"]) <= set(signal_description["events"]), name
+        if "events" in meta:
+            assert set(meta["events"]) <= set(signal_description["events"]), name
 
 
 def test_optional_resource_attributes(signal_description: dict) -> None:

@@ -53,6 +53,7 @@ class CommandRequest:
     channels: list[str] | None = None
     resolved_packages: list[str] | None = None
     update_all: bool = False
+    request_captured: bool = False
 
 
 command_request = CommandRequest()
@@ -209,17 +210,6 @@ def report_success(command: str) -> None:
             return
 
         if request.command.value != command:
-            return
-
-        # Create/install requre a post-solve result.
-        if (
-            request.command
-            in {
-                TelemetryCommand.CREATE,
-                TelemetryCommand.INSTALL,
-            }
-            and request.resolved_packages is None
-        ):
             return
 
         try:

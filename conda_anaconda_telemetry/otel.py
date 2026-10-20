@@ -330,6 +330,8 @@ def get_success_attributes(
     if command not in {"create", "install", "remove", "update"}:
         return None
 
+    # Skip events when required command or request details are missing.
+    # A success event requires resolved packages, even if the list is empty.
     if requested_names is None or channels is None or resolved_packages is None:
         return None
 
@@ -341,12 +343,6 @@ def get_success_attributes(
 
     if command == "update":
         attributes["update.all"] = update_all
-
-    if resolved_packages is None:
-        return {
-            **attributes,
-            "truncated": truncated,
-        }
 
     resolved, resolved_truncated = _truncate(resolved_packages)
     return {
