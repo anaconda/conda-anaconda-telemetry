@@ -145,7 +145,10 @@ def send_all_events() -> None:
     """Report one pnfe and one success event for each command."""
     commands = list(plugin_module.TelemetryCommand)
     request = plugin_module.command_request
-    for command in commands:
+    for command in (
+        plugin_module.TelemetryCommand.CREATE,
+        plugin_module.TelemetryCommand.INSTALL,
+    ):
         request.command = command
         request.requested_names = ["numpy"]
         plugin_module.report_error(
@@ -157,9 +160,12 @@ def send_all_events() -> None:
         )
     for command in commands:
         request.command = command
-        request.requested_names = ["numpy"]
+        request.requested_names = (
+            [] if command == plugin_module.TelemetryCommand.UPDATE else ["numpy"]
+        )
         request.channels = ["defaults"]
         request.resolved_packages = ["numpy=2.0.0=py312_0"]
+        request.update_all = command == plugin_module.TelemetryCommand.UPDATE
         plugin_module.report_success(command.value)
 
 
@@ -190,6 +196,12 @@ def without_service_instance_id(attrs: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in attrs.items() if k != "service.instance.id"}
 
 
+def assert_log_matches_schema(log_attrs: dict, signal_schema: dict) -> None:
+    """Check event attributes against the schema, including update-all."""
+    expected = signal_schema["events"][log_attrs["log.event.name"]]
+    assert_matches_sample(log_attrs, expected)
+
+
 @pytest.mark.usefixtures("telemetry_env")
 def test_real_otlp_payload_received_by_local_collector(signal_schema: dict) -> None:
     """Send all four OTLP events without mocking the SDK and check what arrives."""
@@ -205,7 +217,7 @@ def test_real_otlp_payload_received_by_local_collector(signal_schema: dict) -> N
     assert {path for _, path, _ in OTLPLogsReceiver.received} == {"/v1/logs"}
     assert {ct for _, _, ct in OTLPLogsReceiver.received} == {"application/x-protobuf"}
     records = received_records()
-    assert len(records) == 4
+    assert len(records) == len(signal_schema["events"])
 
     if os.environ.get("UPDATE_SIGNAL_SCHEMA") == "1":
         observed_keys = {"resource": list(records[0][0])}
@@ -225,9 +237,9 @@ def test_real_otlp_payload_received_by_local_collector(signal_schema: dict) -> N
             without_service_instance_id(resource_attrs),
             without_service_instance_id(signal_schema["resource"]),
         )
-        assert_matches_sample(
-            log_attrs, signal_schema["events"][log_attrs["log.event.name"]]
-        )
+
+        assert_log_matches_schema(log_attrs, signal_schema)
+
         # Envelope.
         assert scope.name == "conda-anaconda-telemetry_event_logger"
         assert scope.version == ""
@@ -249,11 +261,17 @@ def test_real_otlp_payload_received_by_local_collector(signal_schema: dict) -> N
 
     # Event-specific values.
     by_name = {log_attrs["log.event.name"]: log_attrs for _, log_attrs, _, _ in records}
-    for command in (c.value for c in plugin_module.TelemetryCommand):
+
+    for command in ("create", "install"):
         pnfe = by_name[f"{command}.pnfe"]
         assert pnfe["exception.missing_specs"] == ["numpy"]
         assert pnfe["exception.name"] == "PackagesNotFoundInChannelsError"
         assert pnfe["requested.packages"] == ["numpy"]
         assert pnfe["install.channels"] == []
+
+    for command in (c.value for c in plugin_module.TelemetryCommand):
         success = by_name[f"{command}.success"]
         assert success["resolved.packages"] == ["numpy=2.0.0=py312_0"]
+
+    assert by_name["update.success"]["update.all"] is True
+    assert by_name["update.success"]["requested.packages"] == []

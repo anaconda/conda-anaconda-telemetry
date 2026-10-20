@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from conda.base.constants import UpdateModifier
 from conda.base.context import context
 from conda.exceptions import PackagesNotFoundInChannelsError
 
@@ -35,6 +36,8 @@ class TelemetryCommand(str, Enum):
 
     CREATE = "create"
     INSTALL = "install"
+    REMOVE = "remove"
+    UPDATE = "update"
 
 
 @dataclass
@@ -49,6 +52,8 @@ class CommandRequest:
     requested_names: list[str] | None = None
     channels: list[str] | None = None
     resolved_packages: list[str] | None = None
+    update_all: bool = False
+    request_captured: bool = False
 
 
 command_request = CommandRequest()
@@ -56,26 +61,60 @@ command_request = CommandRequest()
 
 def capture_command(command: str) -> None:
     """Pre-command hook to record the active command and reset old state."""
-    command_request.requested_names = None
-    command_request.channels = None
-    command_request.resolved_packages = None
+    clear_command()
+
     if not context.plugins.anaconda_telemetry:
-        command_request.command = None
         return
     try:
         command_request.command = TelemetryCommand(command)
+
+        command_request.update_all = (
+            command_request.command == TelemetryCommand.UPDATE
+            and context.update_modifier == UpdateModifier.UPDATE_ALL
+        )
+
         # Success events use configured channels because no exception provides them.
+        if command_request.command in {
+            TelemetryCommand.REMOVE,
+            TelemetryCommand.UPDATE,
+        }:
+            command_request.requested_names = []
+            command_request.resolved_packages = []
+
         command_request.channels = list(context.channels)
     except ValueError:
         command_request.command = None
 
 
 def capture_requested_packages(
-    specs_to_add: frozenset[MatchSpec], _specs_to_remove: frozenset[MatchSpec]
+    specs_to_add: frozenset[MatchSpec],
+    specs_to_remove: frozenset[MatchSpec],
 ) -> None:
     """Pre-solve hook to extract and save requested package names from specs."""
-    if context.plugins.anaconda_telemetry and command_request.command is not None:
-        command_request.requested_names = package_names(list(specs_to_add))
+    if not context.plugins.anaconda_telemetry:
+        return
+
+    command = command_request.command
+    if command is None:
+        return
+
+    if command == TelemetryCommand.UPDATE and command_request.update_all:
+        # No individual pkgs requested by the user
+        command_request.requested_names = []
+        return
+
+    if command == TelemetryCommand.REMOVE:
+        specs = specs_to_remove
+    elif command in {
+        TelemetryCommand.CREATE,
+        TelemetryCommand.INSTALL,
+        TelemetryCommand.UPDATE,
+    }:
+        specs = specs_to_add
+    else:
+        return
+
+    command_request.requested_names = package_names(list(specs))
 
 
 def capture_resolved_packages(
@@ -99,6 +138,7 @@ def clear_command() -> None:
     command_request.requested_names = None
     command_request.channels = None
     command_request.resolved_packages = None
+    command_request.update_all = False
 
 
 # Generic error reporting function which can be expanded to track any error, as needed.
@@ -109,8 +149,19 @@ def report_error(event: CondaExceptionEvent) -> None:
             return
         command = command_request.command
         requested_names = command_request.requested_names
-        if command is None or requested_names is None:
+
+        # Only create/install report package-not-found errors.
+        if (
+            command is None
+            or requested_names is None
+            or command
+            not in {
+                TelemetryCommand.CREATE,
+                TelemetryCommand.INSTALL,
+            }
+        ):
             return
+
         # Guard again even though the observer is only registered for this
         # class, in case of a name collision in `watch_for`.
         if not isinstance(event.exc_value, PackagesNotFoundInChannelsError):
@@ -142,7 +193,7 @@ def report_error(event: CondaExceptionEvent) -> None:
 
 
 def report_success(command: str) -> None:
-    """Report a successful install/create completion to telemetry."""
+    """Report a successful command to telemetry."""
     try:
         if not context.plugins.anaconda_telemetry:
             return
@@ -150,23 +201,34 @@ def report_success(command: str) -> None:
         if context.dry_run or context.download_only:
             return
         request = command_request
-        if request.command is None or request.requested_names is None:
+        if (
+            request.command is None
+            or request.requested_names is None
+            or request.channels is None
+            or request.resolved_packages is None
+        ):
             return
-        # Skip success telemetry when no post-solve result was captured.
-        if request.resolved_packages is None or request.channels is None:
+
+        if request.command.value != command:
             return
+
         try:
             attributes = get_success_attributes(
                 command=request.command.value,
                 channels=request.channels,
                 requested_names=request.requested_names,
                 resolved_packages=request.resolved_packages,
+                update_all=request.update_all,
             )
         except Exception as e:
             logger.debug(
                 "Failed to gather telemetry attributes for %s", command, exc_info=e
             )
             return
+
+        if attributes is None:
+            return
+
         try:
             telemetry = AnacondaTelemetry()
             telemetry.initialize()

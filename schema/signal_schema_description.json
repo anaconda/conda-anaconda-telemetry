@@ -11,6 +11,12 @@
     },
     "create.success": {
       "description": "Sent when `conda create` succeeds. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the plugin has no record of the request or the result."
+    },
+    "remove.success": {
+      "description": "Sent when `conda remove` succeeds. Requested packages are taken from removal specs. Resolved packages may be empty when no packages are linked. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the request was not captured."
+    },
+    "update.success": {
+      "description": "Sent when `conda update` succeeds. Requested packages are taken from the public pre-solve specs. Resolved packages may be empty when no packages are linked. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the request was not captured."
     }
   },
   "resource": {
@@ -199,12 +205,28 @@
     "install.channel_priority": {
       "description": "The channel priority setting of conda.",
       "owner": "plugin",
-      "optional": false
+      "optional": false,
+      "events": [
+        "create.pnfe",
+        "create.success",
+        "install.pnfe",
+        "install.success",
+        "remove.success",
+        "update.success"
+      ]
     },
     "install.channels": {
       "description": "Channels used for the request. Only `defaults`, `main`, `main-x` and `conda-forge` are sent by name. Any other channel is sent as `other`.",
       "owner": "plugin",
-      "optional": false
+      "optional": false,
+      "events": [
+        "create.pnfe",
+        "create.success",
+        "install.pnfe",
+        "install.success",
+        "remove.success",
+        "update.success"
+      ]
     },
     "log.event.name": {
       "description": "Name of the event.",
@@ -217,7 +239,7 @@
       "optional": false
     },
     "resolved.packages": {
-      "description": "Packages that the solver chose to install.",
+      "description": "Packages that the solver chose to install, or an empty list for remove/update.",
       "owner": "plugin",
       "optional": false,
       "outcomes": [
@@ -228,6 +250,17 @@
       "description": "Whether the plugin shortened a list to keep the signal small.",
       "owner": "plugin",
       "optional": false
+    },
+    "update.all": {
+      "description": "Whether the user requested updating all packages instead of specifying individual packages.",
+      "owner": "plugin",
+      "optional": false,
+      "outcomes": [
+        "success"
+      ],
+      "events": [
+        "update.success"
+      ]
     }
   }
 }

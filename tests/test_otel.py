@@ -312,7 +312,7 @@ def test_get_install_attributes(mocker: MockerFixture, command: str) -> None:
 
     assert attributes == {
         "command": command,
-        "event.schema_version": "1",
+        "event.schema_version": "2",
         "install.channels": [
             "defaults",
             "main",
@@ -403,9 +403,9 @@ def test_get_install_attributes_truncation(
     assert attributes["truncated"] == expected_truncated
 
 
-@pytest.mark.parametrize("command", ["install", "create"])
+@pytest.mark.parametrize("command", ["install", "create", "remove", "update"])
 def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
-    """Success attributes use the current schema plus resolved packages."""
+    """Build success attributes with channels for all supported commands."""
     mocker.patch(
         "conda_anaconda_telemetry.otel.context",
         mocker.MagicMock(channel_priority="strict"),
@@ -420,12 +420,13 @@ def test_get_success_attributes(mocker: MockerFixture, command: str) -> None:
 
     assert attributes == {
         "command": command,
-        "event.schema_version": "1",
+        "event.schema_version": "2",
         "install.channels": ["defaults", "main-x", OTHER_CHANNEL_LABEL],
         "install.channel_priority": "strict",
         "requested.packages": ["pkg_bar", "pkg_foo"],
         "resolved.packages": ["pkg_foo=9.9.9=1"],
         "truncated": False,
+        **({"update.all": False} if command == "update" else {}),
     }
 
 
@@ -447,6 +448,7 @@ def test_get_success_attributes_truncated_resolved_packages(
 
     # Byte limit (not item limit) is what trips first for these longer,
     # version-qualified package strings - see LIST_BYTE_LIMIT.
+    assert attributes is not None
     assert len(attributes["resolved.packages"]) < LIST_ITEM_LIMIT
     assert attributes["truncated"] is True
 
@@ -629,6 +631,23 @@ def test_proxy_url_comes_from_conda_not_atel_proxy_url(
     assert config._get_proxy_url() == expected_proxy_url
 
 
+def test_remove_without_post_solve(mocker: MockerFixture) -> None:
+    """Skip remove success when no post-solve state is captured."""
+    mocker.patch(
+        "conda_anaconda_telemetry.otel.context",
+        mocker.MagicMock(channel_priority="strict"),
+    )
+
+    attributes = get_success_attributes(
+        command="remove",
+        channels=[],
+        requested_names=[],
+        resolved_packages=None,
+    )
+
+    assert attributes is None
+
+
 def test_shutdown_before_time_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -652,3 +671,31 @@ def test_shutdown_before_time_limit(
 
     assert done.is_set(), "shutdown() did not return in time"
     assert elapsed < _SHUTDOWN_TIMEOUT_SECONDS + 1.0
+
+
+@pytest.mark.parametrize("command", ["create", "install"])
+def test_success_attributes_with_empty_resolved_packages(
+    mocker: MockerFixture, command: str
+) -> None:
+    """Include an empty resolved.packages list after an empty solve is captured."""
+    mocker.patch(
+        "conda_anaconda_telemetry.otel.context",
+        mocker.MagicMock(channel_priority="strict"),
+    )
+
+    attributes = get_success_attributes(
+        command=command,
+        channels=[],
+        requested_names=[],
+        resolved_packages=[],
+    )
+
+    assert attributes == {
+        "command": command,
+        "event.schema_version": "2",
+        "install.channels": [],
+        "install.channel_priority": "strict",
+        "requested.packages": [],
+        "resolved.packages": [],
+        "truncated": False,
+    }

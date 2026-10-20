@@ -63,7 +63,7 @@ Data handled via OTel are sent to Anaconda's servers.
 <!-- BEGIN GENERATED OTEL SIGNAL -->
 ### Signal version
 
-The signal version is `1`. It is sent as `event.schema_version`, which the plugin sets. It is separate from `schema.version`, which the SDK sets.
+The signal version is `2`. It is sent as `event.schema_version`, which the plugin sets. It is separate from `schema.version`, which the SDK sets.
 
 ### Events
 
@@ -71,6 +71,8 @@ The signal version is `1`. It is sent as `event.schema_version`, which the plugi
 - `create.pnfe`: Sent when `conda create` fails because a requested package is not in the configured channels. It is not sent when telemetry is disabled, when the plugin has no record of the request, or when a package name cannot be read (for example, a URL spec).
 - `install.success`: Sent when `conda install` succeeds. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the plugin has no record of the request or the result.
 - `create.success`: Sent when `conda create` succeeds. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the plugin has no record of the request or the result.
+- `remove.success`: Sent when `conda remove` succeeds. Requested packages are taken from removal specs. Resolved packages may be empty when no packages are linked. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the request was not captured.
+- `update.success`: Sent when `conda update` succeeds. Requested packages are taken from the public pre-solve specs. Resolved packages may be empty when no packages are linked. It is not sent when telemetry is disabled, for dry runs, for download-only runs, or when the request was not captured.
 
 ### Resource attributes
 
@@ -128,7 +130,7 @@ Events: `install.pnfe`, `create.pnfe`.
 
 ### Log attributes: `success` outcome
 
-Events: `install.success`, `create.success`.
+Events: `install.success`, `create.success`, `remove.success`, `update.success`.
 
 | Name | Description | Owner | Presence |
 | --- | --- | --- | --- |
@@ -138,6 +140,7 @@ Events: `install.success`, `create.success`.
 | `install.channels` | Channels used for the request. Only `defaults`, `main`, `main-x` and `conda-forge` are sent by name. Any other channel is sent as `other`. | plugin | always |
 | `log.event.name` | Name of the event. | sdk | always |
 | `requested.packages` | Names of the packages that the user requested. Only package names are sent, with no versions or URLs. | plugin | always |
-| `resolved.packages` | Packages that the solver chose to install. | plugin | always |
+| `resolved.packages` | Packages that the solver chose to install, or an empty list for remove/update. | plugin | always |
 | `truncated` | Whether the plugin shortened a list to keep the signal small. | plugin | always |
+| `update.all` | Whether the user requested updating all packages instead of specifying individual packages. | plugin | always |
 <!-- END GENERATED OTEL SIGNAL -->
