@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from conda.base.context import context
@@ -29,8 +29,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# Change `str, Enum` to StrEnum once we drop Python 3.10.
-class TelemetryCommand(str, Enum):
+class TelemetryCommand(StrEnum):
     """Supported commands for telemetry tracking."""
 
     CREATE = "create"
