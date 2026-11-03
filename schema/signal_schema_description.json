@@ -202,7 +202,7 @@
       "optional": false
     },
     "install.channels": {
-      "description": "Channels used for the request. Only `defaults`, `main`, `main-x` and `conda-forge` are sent by name. Any other channel is sent as `other`.",
+      "description": "Channels used for the request. Only `defaults`, `main`, `main-x`, `conda-forge` and `conda-pypi` are sent by name. Any other channel is sent as `other`.",
       "owner": "plugin",
       "optional": false
     },
