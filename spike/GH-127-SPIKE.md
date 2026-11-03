@@ -15,7 +15,7 @@ This spike recommends splitting the OpenTelemetry (OTel) code in `conda-anaconda
 - **Privacy.** `CO` sends raw values to every provider, and each provider should redact them. The default of the `conda_otel` setting and the question of who opts in are compared in three options (section 5). Both affect user privacy, so the `conda` maintainers should make the choice with this spike's input (**Open**).
 - **Decisions needed, and who answers each.**
   - How providers are found: the `conda` maintainers, who have not been asked yet (blocker 1, **Open**).
-  - The privacy review of the data that `CO` gives to providers: probably also the `conda` maintainers (blocker 2, **Open**).
+  - The privacy review of the data that `CO` gives to providers: likely also reviewed with `conda` maintainers (blocker 2, **Open**).
   - The default of the setting and who opts in: the `conda` maintainers, together with the privacy reviewer (blocker 2, **Open**).
   - The choices made while building the skeleton: the issue author should confirm them (section 4, **Open**).
 
@@ -23,7 +23,7 @@ This spike recommends splitting the OpenTelemetry (OTel) code in `conda-anaconda
 
 ### What the issue asks for
 
-Issue #127 proposes to replace the OTel code in `CAT` with two kinds of package:
+Issue #127 proposes to replace the OTel code in `CAT` with two kinds of package (**Verified**):
 
 - A vendor-neutral plugin, `CO`. It captures `conda` lifecycle events (commands, requested and resolved packages, channels, exceptions) with the official OTel SDK and passes them to registered providers.
 - Provider packages that deliver events to a backend. Anaconda's endpoint, anonymous usage tokens and event schema move into `COA`. Others can write a provider for their own backend.
@@ -43,7 +43,7 @@ The spike has three deliverables: a skeleton of the plugin, a skeleton of the An
 These constraints apply to the new packages.
 
 - The new core plugin (`CO`) is vendor-neutral. It holds no Anaconda endpoint, token or schema.
-- Because `CO` is open source nothing secret can ship in it.
+- Because `CO` is open source, nothing secret can ship in it.
 - Users can turn it off with a `conda` setting.
 - A `conda` command must not halt when the network has problems. The issue asks for a bounded flush.
 - Some users work in air-gapped or restricted networks, so a new endpoint may be blocked.
@@ -52,7 +52,7 @@ These constraints apply to the new packages.
 
 The current `CAT` plugin hooks into `conda install` and `conda create`. It keeps the command, the names of the requested packages, the channels, and the resolved packages. It sends one of four signals: packages not found or success, each for install and create. The signals go through Anaconda's OTel wrapper, `anaconda-opentelemetry` (**Verified**).
 
-Capture and destination sit in one place. The code that builds an event also holds the Anaconda endpoint, the anonymous usage tokens, and several workarounds for the wrapper. The workarounds hide OTel environment variables, flush on a background thread with a three second limit, turn off the wrapper's shutdown handling, and skip its connectivity check. The same code sets the policy for what may be sent: channels map to a fixed list, only package names are sent, and lists are cut to 50 items and 500 bytes.
+Capture and destination sit in one place. The code that builds an event also holds the Anaconda endpoint, the anonymous usage tokens, and several workarounds for the wrapper. The workarounds hide OTel environment variables, flush on a background thread with a three second limit, turn off the wrapper's shutdown handling, and skip its connectivity check. The same code sets the policy for what may be sent: channels map to a fixed list, only package names are sent, and lists are cut to 50 items and 500 bytes (**Verified**).
 
 No part can be reused without the rest. Another backend cannot use the capture code without taking Anaconda's destination logic with it.
 
@@ -60,15 +60,15 @@ No part can be reused without the rest. Another backend cannot use the capture c
 
 ### What was built
 
-The core plugin, `CO`, is a `conda` plugin. Hooks around `conda install` capture the channels, the requested packages, the resolved packages and, for a failed install, the packages that were not found. The plugin turns these into a vendor-neutral event and hands it to every installed provider. Each provider gets its own private OTel pipeline, so providers do not affect each other or other OTel users in the same process. After the event is sent, the plugin waits at most three seconds for delivery. The `conda` command then finishes, and any event that has not arrived by then is dropped. A `conda` setting, on by default, turns the plugin off. With no provider installed, nothing is captured. The plugin hides `OTEL_*` environment variables while it builds its objects, because a user setting could otherwise redirect or change the data. It never writes to the terminal.
+The core plugin, `CO`, is a `conda` plugin. Hooks around `conda install` capture the channels, the requested packages, the resolved packages and, for a failed install, the packages that were not found. The plugin turns these into a vendor-neutral event and hands it to every installed provider. Each provider gets its own private OTel pipeline, so providers do not affect each other or other OTel users in the same process. After the event is sent, the plugin waits at most three seconds for delivery. The `conda` command then finishes, and any event that has not arrived by then is dropped. A `conda` setting, on by default, turns the plugin off. With no provider installed, nothing is captured. The plugin hides `OTEL_*` environment variables while it builds its objects, because a user setting could otherwise redirect or change the data. It never writes to the terminal (**Verified**).
 
 A provider supplies an OTel log exporter, a set of resource attributes, and an optional step that changes the event for that provider only. The step can rename or add attributes, or drop the event.
 
-The Anaconda provider, `COA`, maps the vendor-neutral events to the two install signals named in the issue, `install.pnfe` (here `pnfe` stands for packages not found error) and `install.success`. It sends them to Anaconda's endpoint through the standard OpenTelemetry Protocol (OTLP) HTTP log exporter, the same exporter that `anaconda-opentelemetry` uses, without the wrapper around it. The provider keeps the rules of `CAT`: channels map to a fixed list, and lists are cut to 50 items and 500 bytes. It uses the proxy settings of `conda` and sends the anonymous usage tokens, which it reads from the `anaconda-anon-usage` (AAU) package the same way `anaconda-opentelemetry` does. It also sends its own `client.sdk.version` (the version of `COA`), `schema.version` and `parameters` (an empty object) in place of the values that the wrapper adds.
+The Anaconda provider, `COA`, maps the vendor-neutral events to the two install signals named in the issue, `install.pnfe` (here `pnfe` stands for packages not found error) and `install.success`. It sends them to Anaconda's endpoint through the standard OpenTelemetry Protocol (OTLP) HTTP log exporter, the same exporter that `anaconda-opentelemetry` uses, without the wrapper around it. The provider keeps the rules of `CAT`: channels map to a fixed list, and lists are cut to 50 items and 500 bytes. It uses the proxy settings of `conda` and sends the anonymous usage tokens, which it reads from the `anaconda-anon-usage` (AAU) package the same way `anaconda-opentelemetry` does. It also sends its own `client.sdk.version` (the version of `COA`), `schema.version` and `parameters` (an empty object) in place of the values that the wrapper adds (**Verified**).
 
-The payload is a reduced version of today's. Parity with the `CAT` payload is not a goal of the skeleton. The skeleton does not yet send `conda.version`, `conda.ci_detected`, `os.version`, the installer attributes, `environment` or `service.instance.id`.
+The payload is a reduced version of today's. Parity with the `CAT` payload is not a goal of the skeleton. The skeleton does not yet send `conda.version`, `conda.ci_detected`, `os.version`, the installer attributes, `environment` or `service.instance.id` (**Verified**).
 
-The channels differ from `CAT` on purpose. The plugin sends the channels from the `conda` configuration for both events. `CAT` does the same for a successful install, but for a packages-not-found error it sends the canonical channel names from the error. The new behavior makes the two events consistent.
+The channels differ from `CAT` on purpose. The plugin sends the channels from the `conda` configuration for both events. `CAT` does the same for a successful install, but for a packages-not-found error it sends the canonical channel names from the error. The new behavior makes the two events consistent (**Verified**).
 
 ### What was verified
 
@@ -79,7 +79,7 @@ The tests and checks ran on Linux with Python 3.11, `conda` 26.7.2 and OTel SDK 
 - Two providers run side by side. A slow provider does not block a fast one, and the flush ends within the time limit.
 - The `OTEL_*` variables do not change the payload (see the end-to-end runs below).
 
-The table shows the end-to-end checks (`conda install` with both packages installed), all run by hand. Both wheels were installed in a `conda` test environment, and the Anaconda endpoint was redirected to a local server that records OTLP requests. The appendix describes the procedure.
+The table shows the end-to-end checks (`conda install` with both packages installed), **Verified** via manual tests. Both wheels were installed in a `conda` test environment, and the Anaconda endpoint was redirected to a local server that records OTLP requests. The appendix describes the procedure.
 
 | Case | Result |
 |---|---|
@@ -89,7 +89,7 @@ The table shows the end-to-end checks (`conda install` with both packages instal
 | Endpoint unreachable (closed port) | Install exits with code 0 and prints nothing extra |
 | 18 `OTEL_*` variables set at once | Payload identical to a run without them |
 
-The payload also carried seven of the eight anonymous usage tokens. The eighth, the Anaconda sign-in token, was missing because the tests ran without signing in.
+The payload also carried seven of the eight anonymous usage tokens. The eighth, the Anaconda sign-in token, was missing because the tests ran without signing in (**Verified** via manual tests).
 
 ### Not done
 
@@ -105,7 +105,7 @@ The skeleton is a proof of concept. These parts are left out on purpose or not t
 - The default schema exists only as a description. There is no schema file.
 - No test covers error handling in four of the five hooks.
 
-Section 7 lists these items as follow-up work, with a size for each. The skeleton is small to keep the review short.
+Section 7 lists these items as follow-up work, with a size for each. The skeleton is small to simplify the review process.
 
 
 ## 4. Proposed design
@@ -133,7 +133,7 @@ A provider owns:
 
 The split fits because `CAT` mixes capture and destination (section 2), and different backends may need different policies. The Anaconda backend wants an unknown channel sent as `other`. A company with its own collector may want its internal channel names (**Recommended**).
 
-The split has two consequences. First, the interface between `CO` and a provider is raw. A provider receives the values as `conda` holds them, and `CO` does not normalize or mask them. The channels are the strings from the `conda` configuration, and they can contain a credential, for example a token in a channel URL. Second, each provider must normalize and redact every value before it sends the data. A provider that skips this sends raw values. With no provider installed, `CO` captures nothing at all. Section 5 covers the privacy review.
+The split has two consequences. First, the interface between `CO` and a provider is raw. A provider receives the values as `conda` holds them, and `CO` does not normalize or mask them. The channels are the strings from the `conda` configuration, and they can contain a credential, for example a token in a channel URL. Second, each provider must normalize and redact every value before it sends the data. A provider that skips this sends raw values. With no provider installed, `CO` captures nothing at all. The privacy review in section 5 covers this (**Recommended**).
 
 ### Default schema
 
@@ -151,7 +151,7 @@ The plugin emits `install.success` and `install.packages_not_found`. A provider 
 | `missing_packages` (not found only) | The package names that were not found | `exception.missing_specs` |
 | `exception_name` (not found only) | The type of the error | `exception.name` |
 
-The default resource attributes are neutral facts about the machine: the `conda` version, the operating system type and version, the Python version, and whether a CI environment was detected. The plugin would add them under the attributes of the provider. If both set the same attribute, the value from the provider wins.
+The default resource attributes are neutral facts about the machine: the `conda` version, the operating system type and version, the Python version, and whether a CI environment was detected. The plugin would add them under the attributes of the provider. If both set the same attribute, the value from the provider is used.
 
 This part is not implemented yet. The provider sets the operating system type and the Python version itself, and nothing sets the other three.
 
@@ -162,7 +162,7 @@ The provider owns everything else:
 - the SDK version attributes
 - any identifiers that are specific to the backend. For `COA`, these are the anonymous usage tokens.
 
-A provider selects and overrides in two ways. A step receives the default event and returns any event. It can rename or add attributes, or drop the event. The resource attributes of the provider override the default ones.
+A provider selects and overrides in two ways. A step receives the default event and returns any event. It can rename or add attributes, or drop the event. The resource attributes of the provider override the default ones (**Recommended**).
 
 The proposal has two caveats. The plugin applies no redaction. Attribute values must be scalars or lists of one scalar type.
 
@@ -222,7 +222,7 @@ The recommended order: first move to option B, so that a provider is an ordinary
 
 A privacy review must cover the fields that `CO` gives to every provider before `CO` or any provider is released. The fields are the package names, the channels, the channel priority and the error type. The plugin applies no redaction, so a provider with weaker rules could send more than intended. The reviewer must know which data that `conda` handles may be private (**Open**).
 
-The interface between CO and a provider is raw, and each provider must remove sensitive data (Recommended). How much more it removes depends on its backend. A provider for an internal collector may keep internal channel names. A default rule in CO, for example a fixed channel list, was considered and is not recommended. It puts policy in CO, and a provider that needs raw values cannot get them.
+The interface between CO and a provider is raw, and each provider must remove sensitive data (**Recommended**). How much more it removes depends on its backend. A provider for an internal collector may keep internal channel names. A default rule in CO, for example a fixed channel list, was considered and is not recommended. It puts policy in CO, and a provider that needs raw values cannot get them.
 
 Two more questions affect user privacy: whether the setting is on or off by default, and who opts in. The author of the issue should discuss the options below (**Open**).
 
@@ -244,7 +244,7 @@ The skeleton sends data through the standard OTLP HTTP log exporter. The alterna
 
 ### Smaller decisions for the team
 
-Each of these is open.
+Each of these is an **Open** decision. A recommendation is marked where one exists.
 
 - Disabling the plugin via `OTEL_SDK_DISABLED`. The plugin ignores the variable on purpose. It hides all `OTEL_*` variables so that a user setting cannot change where data goes. The options are to keep ignoring it, or to honor it as an off switch only. The recommendation is the second option, because it cannot redirect any data (**Recommended**).
 - Fork or install. A company may fork a provider, or install an existing one and change its rules, for example the channel list. A forked provider needs only code. An installed one needs a settings surface and a default. The spike records both and does not choose.
