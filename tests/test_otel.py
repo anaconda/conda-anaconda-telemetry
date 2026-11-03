@@ -303,6 +303,7 @@ def test_get_install_attributes(mocker: MockerFixture, command: str) -> None:
             "main",
             "main-x",
             "conda-forge",
+            "conda-pypi",
             "some-private-channel",
         ),
     )
@@ -318,6 +319,7 @@ def test_get_install_attributes(mocker: MockerFixture, command: str) -> None:
             "main",
             "main-x",
             "conda-forge",
+            "conda-pypi",
             OTHER_CHANNEL_LABEL,
         ],
         "install.channel_priority": "strict",

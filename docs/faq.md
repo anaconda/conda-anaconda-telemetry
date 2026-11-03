@@ -121,7 +121,7 @@ Events: `install.pnfe`, `create.pnfe`.
 | `exception.missing_specs` | Names of the packages that were not found. Only package names are sent, with no versions or URLs. | plugin | always |
 | `exception.name` | Name of the error that conda raised. | plugin | always |
 | `install.channel_priority` | The channel priority setting of conda. | plugin | always |
-| `install.channels` | Channels used for the request. Only `defaults`, `main`, `main-x` and `conda-forge` are sent by name. Any other channel is sent as `other`. | plugin | always |
+| `install.channels` | Channels used for the request. Only `defaults`, `main`, `main-x`, `conda-forge` and `conda-pypi` are sent by name. Any other channel is sent as `other`. | plugin | always |
 | `log.event.name` | Name of the event. | sdk | always |
 | `requested.packages` | Names of the packages that the user requested. Only package names are sent, with no versions or URLs. | plugin | always |
 | `truncated` | Whether the plugin shortened a list to keep the signal small. | plugin | always |
@@ -135,7 +135,7 @@ Events: `install.success`, `create.success`.
 | `command` | The conda command that ran. | plugin | always |
 | `event.schema_version` | Version of this signal format. It is not the same as `schema.version`. | plugin | always |
 | `install.channel_priority` | The channel priority setting of conda. | plugin | always |
-| `install.channels` | Channels used for the request. Only `defaults`, `main`, `main-x` and `conda-forge` are sent by name. Any other channel is sent as `other`. | plugin | always |
+| `install.channels` | Channels used for the request. Only `defaults`, `main`, `main-x`, `conda-forge` and `conda-pypi` are sent by name. Any other channel is sent as `other`. | plugin | always |
 | `log.event.name` | Name of the event. | sdk | always |
 | `requested.packages` | Names of the packages that the user requested. Only package names are sent, with no versions or URLs. | plugin | always |
 | `resolved.packages` | Packages that the solver chose to install. | plugin | always |

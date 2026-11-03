@@ -51,7 +51,9 @@ LIST_BYTE_LIMIT = 500
 #: Channel names allowed in the install.channels payload; anything else is
 #: reported as OTHER_CHANNEL_LABEL so a channel URL or internal name can't
 #: reach the payload.
-KNOWN_INSTALL_CHANNELS = frozenset({"defaults", "main", "main-x", "conda-forge"})
+KNOWN_INSTALL_CHANNELS = frozenset(
+    {"defaults", "main", "main-x", "conda-forge", "conda-pypi"}
+)
 OTHER_CHANNEL_LABEL = "other"
 
 #: Hosts accepted for a local collector set with ATEL_DEFAULT_ENDPOINT.
