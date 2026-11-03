@@ -36,7 +36,7 @@ The spike has three deliverables: a skeleton of the plugin, a skeleton of the An
 
 - The HTTP header path of `CAT` is out of scope. The issue only concerns the OTel backend.
 - A provider supplies an OTel exporter.
-- Any changes to `CAT` itself is not part of this spike.
+- Changes to `CAT` itself are not part of this spike.
 
 ### Constraints
 
@@ -54,13 +54,13 @@ The current `CAT` plugin hooks into `conda install` and `conda create`. It keeps
 
 Capture and destination are mixed in one place. The code that builds an event also holds the Anaconda endpoint, the anonymous usage tokens, and several workarounds for the wrapper. The workarounds hide OTel environment variables, flush on a background thread with a three second limit, turn off the wrapper's shutdown handling, and skip its connectivity check. The same code applies the policy for what may be sent: channels map to a fixed list, only package names are sent, and lists are cut to 50 items and 500 bytes (**Verified**).
 
-As a result, no part can be reused without the rest. Another backend cannot use the capture code without taking Anaconda's destination logic with it.
+No part can be reused without the rest. Another backend cannot use the capture code without taking Anaconda's destination logic with it.
 
 ## 3. What was built and verified
 
 ### What was built
 
-The core plugin, `CO`, is a `conda` plugin. Hooks around `conda install` capture the channels, the requested packages, the resolved packages and, for a failed install, the packages that were not found. The plugin turns these into a vendor-neutral event and hands it to every installed provider. Each provider gets its own private OTel pipeline, which results in providers not affecting each other or other OTel users in the same process. After the event is sent, the plugin waits at most **three seconds** for delivery. The `conda` command then finishes, and any event that has not arrived by then is dropped. A `conda` setting, on by default, turns the plugin off. With no provider installed, nothing is captured. The plugin hides `OTEL_*` environment variables while it builds its objects for security reasons. Otherwise a user setting can redirect or modify the data. It never writes to the terminal (**Verified**).
+The core plugin, `CO`, is a `conda` plugin. Hooks around `conda install` capture the channels, the requested packages, the resolved packages and, for a failed install, the packages that were not found. The plugin turns these into a vendor-neutral event and hands it to every installed provider. Each provider gets its own private OTel pipeline, which results in providers not affecting each other or other OTel users in the same process. After the event is sent, the plugin waits at most three seconds for delivery. The `conda` command then finishes, and any event that has not arrived by then is dropped. A `conda` setting, on by default, turns the plugin off. With no provider installed, nothing is captured. The plugin hides `OTEL_*` environment variables while it builds its objects for security reasons. Otherwise a user setting can redirect or modify the data. It never writes to the terminal (**Verified**).
 
 A provider supplies an OTel log exporter, a set of resource attributes, and an optional step that changes the event for that provider only. The step can rename or add attributes, or drop the event.
 
@@ -161,7 +161,6 @@ The provider owns everything else:
 - the identity of the backend: service name and version, platform, environment and instance ID
 - the SDK version attributes
 - any identifiers that are specific to the backend. As an example for `COA`, these are the anonymous usage tokens.
-- the installer attributes. Whether these are neutral facts is part of the privacy review.
 
 A provider selects and overrides in two ways. A step receives the default event and returns any event. It can rename or add attributes, or drop the event. The resource attributes of the provider override the default ones (**Recommended**).
 
@@ -205,7 +204,7 @@ The following choices were made while building the skeleton. All are **Recommend
 
 ## 5. Decisions needed
 
-Two blockers need an answer from other people. Both leave the skeleton and this report unaffected, but they block a release. A third table compares two ways to build the Anaconda provider. A short list of smaller team decisions follows.
+Two blockers need an answer from other people. Both leave the skeleton and this report unaffected, but they block a release.
 
 ### Blocker 1: how providers are found
 
@@ -247,8 +246,8 @@ The skeleton sends data through the standard OTLP HTTP log exporter. The alterna
 
 Each of these is an **Open** decision. A recommendation is marked where one exists.
 
-- **Disabling the plugin via `OTEL_SDK_DISABLED`.** The plugin ignores the variable on purpose, because it hides all `OTEL_*` variables so that a user setting cannot change where data goes. The options are to keep ignoring it, or to honor it as an off switch only. The recommendation is the second option, because it cannot redirect any data (**Recommended**).
-- **Fork or install.** A company may fork a provider, or install an existing one and change its rules, for example the channel list. A forked provider needs only code. An installed one needs a settings surface and a default. The spike records both and does not choose.
+- Disabling the plugin via `OTEL_SDK_DISABLED`. The plugin ignores the variable on purpose, because it hides all `OTEL_*` variables so that a user setting cannot change where data goes. The options are to keep ignoring it, or to honor it as an off switch only. The recommendation is the second option, because it cannot redirect any data (**Recommended**).
+- Fork or install. A company may fork a provider, or install an existing one and change its rules, for example the channel list. A forked provider needs only code. An installed one needs a settings surface and a default. The spike records both and does not choose.
 
 ## 6. Risks, open problems and unverified assumptions
 
@@ -327,9 +326,9 @@ The order and the sizes are **Recommended**. The sizes are guesses for one engin
 
 The tests and checks ran on Linux with Python 3.11, `conda` 26.7.2 and OTel SDK 1.40.0.
 
-**Unit tests.** Each repository has an `environment.yml` file. Then run `pip install -e .` and `python -m pytest` in each repository. The `pytest` version is pinned to below 9.1 because `pytest` 9.1 and newer fails and fixing this has been left out of this spike. The plugin itself is not affected. GitHub Actions runs the same steps in both repositories.
+For unit tests, each repository has an `environment.yml` file. Then run `pip install -e .` and `python -m pytest` in each repository. The `pytest` version is pinned to below 9.1 because `pytest` 9.1 and newer fails and fixing this has been left out of this spike. The plugin itself is not affected. GitHub Actions runs the same steps in both repositories.
 
-**End-to-end checks.** These checks were run manually, and no scripts were kept. The steps were:
+The end-to-end checks were run manually, and no scripts were kept. The steps were:
 
 1. Create the test environment.
 2. Build a wheel of each package and install both wheels into the copy, without their dependencies.
@@ -338,4 +337,4 @@ The tests and checks ran on Linux with Python 3.11, `conda` 26.7.2 and OTel SDK 
 5. Run `conda install` for each case in the table of section 3, count the recorded requests after each run.
 6. For the unreachable endpoint, point the provider at a closed port. For the `OTEL_*` check, set the 18 variables, repeat one run, and compare the recorded payload with a run without them.
 
-**Manual test of option B.** Two small packages were written by hand. One stands in for the plugin and adds its own extension point to the plugin manager of `conda` on first use. The other is a provider that registers as an ordinary `conda` plugin for that extension point. Running `conda info` with both installed showed the provider results. Running it with only the provider installed gave no error. For the import cost, `conda info` ran six times with and without the module of the Anaconda provider registered as a `conda` plugin, and the run times were compared.
+For the manual test of option B, two small packages were written by hand. One stands in for the plugin and adds its own extension point to the plugin manager of `conda` on first use. The other is a provider that registers as an ordinary `conda` plugin for that extension point. Running `conda info` with both installed showed the provider results. Running it with only the provider installed gave no error. For the import cost, `conda info` ran six times with and without the module of the Anaconda provider registered as a `conda` plugin, and the run times were compared.
