@@ -40,8 +40,7 @@ except ImportError:
     conda_build_version = "n/a"
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Generator, Iterator, Sequence
-    from typing import Callable
+    from collections.abc import Callable, Generator, Iterator, Sequence
 
 logger = logging.getLogger(__name__)
 
