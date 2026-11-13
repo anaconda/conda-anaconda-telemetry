@@ -22,6 +22,28 @@ We currently collect the following information when this plugin is installed:
   `package-b` will be tracked)
 - Usage tokens provided by `anaconda-anon-usage` (e.g. a client token and a per-session token). For the exact fields that are exported - see [below](#telemetry-data-via-opentelemetry).
 
+### How are private channels handled in HTTP headers?
+
+The channel and installed-package headers include only channels with explicitly
+allowed public URLs. Other channels and their installed packages are omitted.
+Installed-package entries keep the channel, subdirectory, name, version, and build
+format, using a fixed public channel label instead of any user-defined alias.
+
+Search and install headers contain package names only. Specs containing URLs or
+paths are omitted, including channel URLs and subdirectory-qualified channels.
+This avoids treating a private URL as a public channel when older conda versions
+discard the host during parsing. Specs containing `~` or `..` are also omitted,
+including compatible-release version specs such as `numpy~=1.26`.
+Unqualified package names are omitted when any
+configured channel is private because their source is not yet known. Specs using
+a public channel name, such as `conda-forge::numpy`, can still be reported in that
+case. Install headers use specs captured before solving. When `--file` is used,
+only specs with an explicitly public named channel are included because a YAML
+file can supply private channels that are absent from conda's global channel
+configuration. Before the pre-solve capture runs, the install header is empty.
+
+These rules apply to HTTP headers. OpenTelemetry fields are described below.
+
 ## Which commands are you tracking?
 
 We only track commands that make network requests. This includes the following:

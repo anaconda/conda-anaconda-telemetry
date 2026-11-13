@@ -46,6 +46,7 @@ class CommandRequest:
 
     command: TelemetryCommand | None = None
     requested_names: list[str] | None = None
+    requested_specs: tuple[MatchSpec, ...] = ()
     channels: list[str] | None = None
     resolved_packages: list[str] | None = None
 
@@ -56,6 +57,7 @@ command_request = CommandRequest()
 def capture_command(command: str) -> None:
     """Pre-command hook to record the active command and reset old state."""
     command_request.requested_names = None
+    command_request.requested_specs = ()
     command_request.channels = None
     command_request.resolved_packages = None
     if not context.plugins.anaconda_telemetry:
@@ -74,6 +76,7 @@ def capture_requested_packages(
 ) -> None:
     """Pre-solve hook to extract and save requested package names from specs."""
     if context.plugins.anaconda_telemetry and command_request.command is not None:
+        command_request.requested_specs = tuple(specs_to_add)
         command_request.requested_names = package_names(list(specs_to_add))
 
 
@@ -96,6 +99,7 @@ def clear_command() -> None:
     """
     command_request.command = None
     command_request.requested_names = None
+    command_request.requested_specs = ()
     command_request.channels = None
     command_request.resolved_packages = None
 
